@@ -4199,12 +4199,12 @@ do
         };
 
         local Parts = Info.Parts or {
-            { Key = 'Head', Text = 'Head', Position = UDim2.fromOffset(86, 4), Size = UDim2.fromOffset(48, 34) };
-            { Key = 'Torso', Text = 'Torso', Position = UDim2.fromOffset(79, 43), Size = UDim2.fromOffset(62, 64) };
-            { Key = 'LeftArm', Text = 'L Arm', Position = UDim2.fromOffset(42, 46), Size = UDim2.fromOffset(32, 62) };
-            { Key = 'RightArm', Text = 'R Arm', Position = UDim2.fromOffset(146, 46), Size = UDim2.fromOffset(32, 62) };
-            { Key = 'LeftLeg', Text = 'L Leg', Position = UDim2.fromOffset(80, 112), Size = UDim2.fromOffset(28, 54) };
-            { Key = 'RightLeg', Text = 'R Leg', Position = UDim2.fromOffset(112, 112), Size = UDim2.fromOffset(28, 54) };
+            { Key = 'Head', Text = 'Head', Position = UDim2.fromOffset(96, 4), Size = UDim2.fromOffset(28, 28) };
+            { Key = 'Torso', Text = 'Torso', Position = UDim2.fromOffset(78, 38), Size = UDim2.fromOffset(64, 64) };
+            { Key = 'LeftArm', Text = 'L Arm', Position = UDim2.fromOffset(44, 38), Size = UDim2.fromOffset(28, 64) };
+            { Key = 'RightArm', Text = 'R Arm', Position = UDim2.fromOffset(148, 38), Size = UDim2.fromOffset(28, 64) };
+            { Key = 'LeftLeg', Text = 'L Leg', Position = UDim2.fromOffset(80, 108), Size = UDim2.fromOffset(28, 64) };
+            { Key = 'RightLeg', Text = 'R Leg', Position = UDim2.fromOffset(112, 108), Size = UDim2.fromOffset(28, 64) };
         };
 
         local Buttons = {};
