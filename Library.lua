@@ -501,6 +501,8 @@ function Library:CreateCommandModal(Info)
         LastTextToken = 0;
         Callback = Info.Callback or function() end;
     };
+    local AcceptedQuery = false;
+    local SuppressHotkeyTextUntil = 0;
 
     local ModalOuter = Library:Create('Frame', {
         AnchorPoint = Vector2.new(0.5, 0.5);
@@ -840,6 +842,7 @@ function Library:CreateCommandModal(Info)
         if type(Info.ResolveQuery) == 'function' then
             local Resolved = Info.ResolveQuery(Query, self.Filtered[self.SelectedIndex], self.Filtered);
             if Resolved then
+                AcceptedQuery = Info.ClearOnAccept == true;
                 Library:SafeCallback(self.Callback, Resolved, self.Filtered[self.SelectedIndex], Query);
                 self:SetVisible(false);
                 return;
@@ -849,6 +852,7 @@ function Library:CreateCommandModal(Info)
         local Item = self.Filtered[self.SelectedIndex];
         if not Item then
             if Info.AllowRawAccept and Query:gsub('%s+', '') ~= '' then
+                AcceptedQuery = Info.ClearOnAccept == true;
                 Library:SafeCallback(self.Callback, Query, nil, Query);
                 self:SetVisible(false);
             end;
@@ -856,6 +860,7 @@ function Library:CreateCommandModal(Info)
             return;
         end;
 
+        AcceptedQuery = Info.ClearOnAccept == true;
         Library:SafeCallback(Item.Callback or self.Callback, Item.Value, Item, Query);
         self:SetVisible(false);
     end;
@@ -873,10 +878,24 @@ function Library:CreateCommandModal(Info)
             self.SelectedIndex = 1;
             self.ScrollIndex = 1;
             InputBox:CaptureFocus();
+            task.defer(function()
+                if ModalOuter.Visible then
+                    InputBox:CaptureFocus();
+                    InputBox.CursorPosition = #InputBox.Text + 1;
+                end;
+            end);
             self:Refresh();
         else
-            self.LastText = InputBox.Text or '';
-            self.LastTextExpires = os.clock() + 20;
+            if AcceptedQuery then
+                self.LastText = '';
+                self.LastTextExpires = 0;
+                InputBox.Text = '';
+                AcceptedQuery = false;
+            else
+                self.LastText = InputBox.Text or '';
+                self.LastTextExpires = os.clock() + 20;
+            end;
+
             self.LastTextToken = self.LastTextToken + 1;
             local Token = self.LastTextToken;
 
@@ -899,11 +918,27 @@ function Library:CreateCommandModal(Info)
         self:SetVisible(not ModalOuter.Visible);
     end;
 
+    function CommandModal:ClearText()
+        self.LastText = '';
+        self.LastTextExpires = 0;
+        self.LastTextToken = self.LastTextToken + 1;
+        InputBox.Text = '';
+        self.SelectedIndex = 1;
+        self.ScrollIndex = 1;
+        self:Refresh();
+    end;
+
     function CommandModal:Destroy()
         ModalOuter:Destroy();
     end;
 
     InputBox:GetPropertyChangedSignal('Text'):Connect(function()
+        if SuppressHotkeyTextUntil > os.clock() and InputBox.Text:find(';', 1, true) then
+            InputBox.Text = InputBox.Text:gsub('^;', ''):gsub(';$', '');
+            InputBox.CursorPosition = #InputBox.Text + 1;
+            return;
+        end;
+
         CommandModal.SelectedIndex = 1;
         CommandModal:Refresh();
     end);
@@ -919,7 +954,15 @@ function Library:CreateCommandModal(Info)
         if Input.UserInputType == Enum.UserInputType.Keyboard and type(Info.ToggleKeys) == 'table' then
             for _, KeyCode in next, Info.ToggleKeys do
                 if Input.KeyCode == KeyCode and not Processed then
+                    SuppressHotkeyTextUntil = os.clock() + 0.35;
                     CommandModal:Toggle();
+                    task.defer(function()
+                        if ModalOuter.Visible then
+                            InputBox:CaptureFocus();
+                            InputBox.Text = InputBox.Text:gsub('^;', ''):gsub(';$', '');
+                            InputBox.CursorPosition = #InputBox.Text + 1;
+                        end;
+                    end);
                     return;
                 end;
             end;
@@ -1269,6 +1312,7 @@ function Library:CreateInfiniteYieldCommandModal(Info)
         MaxRows = Info.MaxRows or 7;
         Items = Wrapper:GetCommandItems();
         AllowRawAccept = true;
+        ClearOnAccept = true;
         ToggleKeys = { Enum.KeyCode.Semicolon };
         Filter = function(Item, Query)
             Query = tostring(Query or ''):lower():gsub('^%s+', '');
