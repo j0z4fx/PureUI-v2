@@ -29,11 +29,11 @@ local Library = {
 
     HudRegistry = {};
 
-    FontColor = Color3.fromRGB(255, 255, 255);
-    MainColor = Color3.fromRGB(28, 28, 28);
-    BackgroundColor = Color3.fromRGB(20, 20, 20);
-    AccentColor = Color3.fromRGB(0, 85, 255);
-    OutlineColor = Color3.fromRGB(50, 50, 50);
+    FontColor = Color3.fromRGB(245, 238, 238);
+    MainColor = Color3.fromRGB(24, 24, 24);
+    BackgroundColor = Color3.fromRGB(17, 17, 17);
+    AccentColor = Color3.fromRGB(216, 114, 150);
+    OutlineColor = Color3.fromRGB(45, 45, 45);
     RiskColor = Color3.fromRGB(255, 50, 50),
 
     Black = Color3.new(0, 0, 0);
@@ -313,12 +313,12 @@ end;
 
 function Library:GetDarkerColor(Color)
     local H, S, V = Color3.toHSV(Color);
-    return Color3.fromHSV(H, S, V / 1.5);
+    return Color3.fromHSV(H, S, math.clamp(V * 0.78, 0, 1));
 end;
 
 function Library:GetLighterColor(Color)
     local H, S, V = Color3.toHSV(Color);
-    return Color3.fromHSV(H, math.clamp(S * 0.9, 0, 1), math.clamp((V * 1.25) + 0.05, 0, 1));
+    return Color3.fromHSV(H, math.clamp(S * 0.96, 0, 1), math.clamp((V * 1.08) + 0.015, 0, 1));
 end;
 
 function Library:ResolveColor(Color)
@@ -336,6 +336,7 @@ function Library:GetGradientSequence(Color)
 
     return ColorSequence.new({
         ColorSequenceKeypoint.new(0, Library:GetLighterColor(Color)),
+        ColorSequenceKeypoint.new(0.68, Color),
         ColorSequenceKeypoint.new(1, Library:GetDarkerColor(Color)),
     });
 end;
