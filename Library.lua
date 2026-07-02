@@ -1101,7 +1101,7 @@ function Library:LoadInfiniteYield(Info)
         Library.InfiniteYield = nil;
     end;
 
-    local Source = Info.Source or 'https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source';
+    local Source = Info.Source or 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/main/InfiniteYield.lua';
     local Wrapper = {
         Source = Source;
     };
@@ -1135,33 +1135,7 @@ function Library:LoadInfiniteYield(Info)
 
     if not Env.IY_LOADED or Info.Reload or not HasRunner then
         local Ok, Result = pcall(function()
-            local SourceCode = game:HttpGet(Source);
-            SourceCode = SourceCode:gsub('insts%[v%[1%]%]%[prop%] = val', 'pcall(function() insts[v[1]][prop] = val end)');
-            SourceCode = SourceCode .. [[
-
-pcall(function()
-    local Env = getgenv()
-    Env.IY_LOADED = IY_LOADED
-    Env.execCmd = execCmd
-    Env.cmds = cmds
-    Env.CMDs = CMDs
-    Env.notify = notify
-    Env.PARENT = PARENT
-    Env.Holder = Holder
-    Env.Notification = Notification
-    Env.logs = logs
-    Env.chat = chat
-    Env.join = join
-    Env.KeybindsFrame = KeybindsFrame
-    Env.KeybindEditor = KeybindEditor
-    Env.PositionsFrame = PositionsFrame
-    Env.AliasesFrame = AliasesFrame
-    Env.PluginsFrame = PluginsFrame
-    Env.PluginEditor = PluginEditor
-    Env.ToPartFrame = ToPartFrame
-end)
-]];
-            return loadstring(SourceCode)();
+            return loadstring(game:HttpGet(Source))();
         end);
 
         if not Ok then

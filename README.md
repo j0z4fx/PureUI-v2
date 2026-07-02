@@ -87,10 +87,11 @@ Press `Ctrl+K` to open the command modal. Type to filter suggestions, use the ar
 local CommandModal = Library:CreateInfiniteYieldCommandModal({
     Title = 'Infinite Yield',
     Placeholder = 'Run command...',
+    Source = repo .. 'InfiniteYield.lua',
 })
 ```
 
-The wrapper loads Infinite Yield, hides its default command menu, feeds IY commands into the Pure command modal, and executes selected or typed commands through IY's `execCmd`. IY utility windows and later external tool UIs are restyled with the Pure theme where possible.
+The wrapper loads the repo-owned `InfiniteYield.lua` fork, hides its default command menu, feeds IY commands into the Pure command modal, and executes selected or typed commands through IY's `execCmd`. IY utility windows and later external tool UIs are restyled with the Pure theme where possible.
 
 ## Interface Preview
 <img src="https://i.imgur.com/qs0Hqc6.png" />
