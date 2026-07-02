@@ -422,9 +422,7 @@ function Library:AddHoverStroke(Instance)
         Color = 'AccentColor';
     });
 
-    local Gradient = Library:AddGradient(Stroke, 'AccentColor', 0, true);
-
-    return Stroke, Gradient;
+    return Stroke;
 end;
 
 function Library:SetGradientColor(Instance, Color)
@@ -929,7 +927,7 @@ do
 
         Library:AddToRegistry(PickerFrameInner, { BackgroundColor3 = 'BackgroundColor'; BorderColor3 = 'OutlineColor'; });
         Library:AddToRegistry(Highlight, { BackgroundColor3 = 'AccentColor'; });
-        Library:AddGradient(Highlight, 'AccentColor', 0, true);
+        Library:AddGradient(Highlight, 'AccentColor', 0);
         Library:AddToRegistry(SatVibMapInner, { BackgroundColor3 = 'BackgroundColor'; BorderColor3 = 'OutlineColor'; });
 
         Library:AddToRegistry(HueBoxInner, { BackgroundColor3 = 'ControlColor'; BorderColor3 = 'OutlineColor'; });
@@ -3302,6 +3300,23 @@ function Library:CreateWindow(...)
             BackgroundColor3 = 'MainColor';
         });
 
+        -- Accent highlight bar shown on the active tab. Sits at the bottom edge
+        -- of the tab button; tweened in/out via Tab:ShowTab / Tab:HideTab.
+        local TabHighlight = Library:Create('Frame', {
+            BackgroundColor3 = Library.AccentColor;
+            BorderSizePixel = 0;
+            Position = UDim2.new(0, 0, 1, -2);
+            Size = UDim2.new(1, 0, 0, 2);
+            BackgroundTransparency = 1;
+            ZIndex = 4;
+            Parent = TabButton;
+        });
+
+        Library:AddToRegistry(TabHighlight, {
+            BackgroundColor3 = 'AccentColor';
+        });
+        Library:AddGradient(TabHighlight, 'AccentColor', 0);
+
         local TabFrame = Library:Create('Frame', {
             Name = 'TabFrame',
             BackgroundTransparency = 1;
@@ -3369,6 +3384,7 @@ function Library:CreateWindow(...)
             Library:SetGradientColor(TabButton, 'ControlColor');
             Library:Tween(TabButton, 0.12, { BackgroundColor3 = Library.ControlColor });
             Library:Tween(Blocker, 0.12, { BackgroundTransparency = 0 });
+            Library:Tween(TabHighlight, 0.12, { BackgroundTransparency = 0 });
             TabFrame.Visible = true;
         end;
 
@@ -3377,6 +3393,7 @@ function Library:CreateWindow(...)
             Library:SetGradientColor(TabButton, 'MainColor');
             Library:Tween(TabButton, 0.12, { BackgroundColor3 = Library.MainColor });
             Library:Tween(Blocker, 0.12, { BackgroundTransparency = 1 });
+            Library:Tween(TabHighlight, 0.12, { BackgroundTransparency = 1 });
             TabFrame.Visible = false;
         end;
 
@@ -3427,7 +3444,7 @@ function Library:CreateWindow(...)
             Library:AddToRegistry(Highlight, {
                 BackgroundColor3 = 'AccentColor';
             });
-            Library:AddGradient(Highlight, 'AccentColor', 0, true);
+            Library:AddGradient(Highlight, 'AccentColor', 0);
 
             local GroupboxLabel = Library:CreateLabel({
                 Size = UDim2.new(1, 0, 0, 18);
@@ -3528,7 +3545,7 @@ function Library:CreateWindow(...)
             Library:AddToRegistry(Highlight, {
                 BackgroundColor3 = 'AccentColor';
             });
-            Library:AddGradient(Highlight, 'AccentColor', 0, true);
+            Library:AddGradient(Highlight, 'AccentColor', 0);
 
             local TabboxButtons = Library:Create('Frame', {
                 BackgroundTransparency = 1;
