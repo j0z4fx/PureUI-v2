@@ -1,7 +1,7 @@
 -- New example script written by wally
 -- You can suggest changes with a pull request or something
 
-local repo = 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/30ab35a/'
+local repo = 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/7f7d8d7/'
 local cacheBust = '?v=' .. tostring(os.time())
 
 local Library = loadstring(game:HttpGet(repo .. 'Library.lua' .. cacheBust))()
@@ -66,8 +66,8 @@ PlayerList:AddToggle('SpectatePlayer', {
 })
 
 PlayerList:AddDropdown('Disposition', {
-    Values = { 'Whitelist', 'Enemy', 'Sentry', 'Sentry (Passive)' },
-    Default = 'Whitelist',
+    Values = { 'None', 'Whitelist', 'Enemy', 'Sentry', 'Sentry (Passive)' },
+    Default = 'None',
     Callback = function(Value, Player)
         Library:Notify((Player and Player.Name or 'No player') .. ': ' .. tostring(Value), 2)
     end,
@@ -84,6 +84,10 @@ local Window = Library:CreateWindow({
     AutoShow = true,
     TabPadding = 8,
     MenuFadeTime = 0.2
+})
+
+local EspPreview = Window:AddEspPreview({
+    Title = 'ESP Preview',
 })
 
 -- CALLBACK NOTE:
