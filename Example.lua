@@ -1,7 +1,7 @@
 -- New example script written by wally
 -- You can suggest changes with a pull request or something
 
-local repo = 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/24423c8/'
+local repo = 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/6e5c844/'
 local cacheBust = '?v=' .. tostring(os.time())
 
 local Library = loadstring(game:HttpGet(repo .. 'Library.lua' .. cacheBust))()
@@ -454,7 +454,7 @@ local WatermarkConnection = game:GetService('RunService').RenderStepped:Connect(
     ));
 end);
 
-Library.KeybindFrame.Visible = true; -- todo: add a function for this
+Library:SetManagedWindowVisible('Keybinds', true)
 
 Library:OnUnload(function()
     WatermarkConnection:Disconnect()
