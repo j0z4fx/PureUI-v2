@@ -56,6 +56,21 @@ PlayerList:AddToggle('SpectatePlayer', {
 
 The player list window is separate from the main menu. The top section shows players with profile pictures, and the bottom third is reserved for compact action controls. Action callbacks receive the selected player.
 
+### Command Modal
+
+```lua
+local CommandModal = Library:CreateCommandModal({
+    Title = 'Fruits',
+    Placeholder = 'Search fruits...',
+    Items = { 'Apple', 'Banana', 'Cherry', 'Mango', 'Watermelon' },
+    Callback = function(Value)
+        print('Selected command:', Value)
+    end,
+})
+```
+
+Press `Ctrl+K` to open the command modal. Type to filter suggestions, use the arrow keys to move selection, press `Enter` to select, and press `Tab` to autocomplete the top result.
+
 ## Interface Preview
 <img src="https://i.imgur.com/qs0Hqc6.png" />
 

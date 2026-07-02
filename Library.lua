@@ -488,6 +488,367 @@ function Library:CreateBottomBar()
     return BarOuter;
 end;
 
+function Library:CreateCommandModal(Info)
+    Info = Info or {};
+
+    local CommandModal = {
+        Items = {};
+        Filtered = {};
+        SelectedIndex = 1;
+        Callback = Info.Callback or function() end;
+    };
+
+    local ModalOuter = Library:Create('Frame', {
+        AnchorPoint = Vector2.new(0.5, 0.5);
+        BorderColor3 = Color3.new(0, 0, 0);
+        Position = Info.Position or UDim2.new(0.5, 0, 0.42, 0);
+        Size = Info.Size or UDim2.fromOffset(380, 252);
+        Visible = false;
+        ZIndex = 240;
+        Parent = ScreenGui;
+    });
+
+    local ModalInner = Library:Create('Frame', {
+        BackgroundColor3 = Library.MainColor;
+        BorderColor3 = Library.OutlineColor;
+        BorderMode = Enum.BorderMode.Inset;
+        Size = UDim2.new(1, 0, 1, 0);
+        ZIndex = 241;
+        Parent = ModalOuter;
+    });
+
+    Library:AddToRegistry(ModalInner, {
+        BackgroundColor3 = 'MainColor';
+        BorderColor3 = 'OutlineColor';
+    }, true);
+    Library:AddGradient(ModalInner, 'MainColor');
+
+    local AccentBar = Library:Create('Frame', {
+        BackgroundColor3 = Library.AccentColor;
+        BorderSizePixel = 0;
+        Size = UDim2.new(1, 0, 0, 2);
+        ZIndex = 246;
+        Parent = ModalInner;
+    });
+
+    Library:AddToRegistry(AccentBar, {
+        BackgroundColor3 = 'AccentColor';
+    }, true);
+    Library:AddGradient(AccentBar, 'AccentColor', 0, true, true);
+
+    local TitleLabel = Library:CreateLabel({
+        Position = UDim2.new(0, 10, 0, 6);
+        Size = UDim2.new(1, -20, 0, 18);
+        Text = Info.Title or 'Command';
+        TextSize = 14;
+        TextXAlignment = Enum.TextXAlignment.Left;
+        ZIndex = 246;
+        Parent = ModalInner;
+    }, true);
+
+    local InputOuter = Library:Create('Frame', {
+        BackgroundColor3 = Color3.new(0, 0, 0);
+        BorderColor3 = Color3.new(0, 0, 0);
+        Position = UDim2.new(0, 10, 0, 31);
+        Size = UDim2.new(1, -20, 0, 28);
+        ZIndex = 242;
+        Parent = ModalInner;
+    });
+
+    Library:AddToRegistry(InputOuter, {
+        BorderColor3 = 'Black';
+    }, true);
+
+    local InputInner = Library:Create('Frame', {
+        BackgroundColor3 = Library.ControlColor;
+        BorderColor3 = Library.OutlineColor;
+        BorderMode = Enum.BorderMode.Inset;
+        Size = UDim2.new(1, 0, 1, 0);
+        ZIndex = 243;
+        Parent = InputOuter;
+    });
+
+    Library:AddToRegistry(InputInner, {
+        BackgroundColor3 = 'ControlColor';
+        BorderColor3 = 'OutlineColor';
+    }, true);
+    Library:AddGradient(InputInner, 'ControlColor');
+
+    local InputBox = Library:Create('TextBox', {
+        BackgroundTransparency = 1;
+        ClearTextOnFocus = false;
+        Font = Library.Font;
+        PlaceholderText = Info.Placeholder or 'Search commands...';
+        Position = UDim2.new(0, 8, 0, 0);
+        Size = UDim2.new(1, -16, 1, 0);
+        Text = '';
+        TextColor3 = Library.FontColor;
+        TextSize = 14;
+        TextStrokeTransparency = 1;
+        TextXAlignment = Enum.TextXAlignment.Left;
+        ZIndex = 245;
+        Parent = InputInner;
+    });
+
+    Library:AddToRegistry(InputBox, {
+        TextColor3 = 'FontColor';
+    }, true);
+
+    local GhostLabel = Library:CreateLabel({
+        BackgroundTransparency = 1;
+        Position = UDim2.new(0, 8, 0, 0);
+        Size = UDim2.new(1, -16, 1, 0);
+        Text = '';
+        TextColor3 = Library.FontColor;
+        TextSize = 14;
+        TextTransparency = 0.55;
+        TextXAlignment = Enum.TextXAlignment.Left;
+        ZIndex = 244;
+        Parent = InputInner;
+    }, true);
+
+    local ResultsOuter = Library:Create('Frame', {
+        BackgroundColor3 = Library.BackgroundColor;
+        BorderColor3 = Library.OutlineColor;
+        BorderMode = Enum.BorderMode.Inset;
+        Position = UDim2.new(0, 10, 0, 67);
+        Size = UDim2.new(1, -20, 1, -77);
+        ZIndex = 242;
+        Parent = ModalInner;
+    });
+
+    Library:AddToRegistry(ResultsOuter, {
+        BackgroundColor3 = 'BackgroundColor';
+        BorderColor3 = 'OutlineColor';
+    }, true);
+
+    local ResultRows = {};
+    local MaxRows = Info.MaxRows or 6;
+
+    for Index = 1, MaxRows do
+        local RowOuter = Library:Create('Frame', {
+            Active = true;
+            BackgroundColor3 = Color3.new(0, 0, 0);
+            BorderColor3 = Color3.new(0, 0, 0);
+            Position = UDim2.new(0, 4, 0, 4 + ((Index - 1) * 28));
+            Size = UDim2.new(1, -8, 0, 26);
+            Visible = false;
+            ZIndex = 243;
+            Parent = ResultsOuter;
+        });
+
+        Library:AddToRegistry(RowOuter, {
+            BorderColor3 = 'Black';
+        }, true);
+
+        local RowInner = Library:Create('Frame', {
+            BackgroundColor3 = Library.BackgroundColor;
+            BorderColor3 = Library.OutlineColor;
+            BorderMode = Enum.BorderMode.Inset;
+            Size = UDim2.new(1, 0, 1, 0);
+            ZIndex = 244;
+            Parent = RowOuter;
+        });
+
+        Library:AddToRegistry(RowInner, {
+            BackgroundColor3 = 'BackgroundColor';
+            BorderColor3 = 'OutlineColor';
+        }, true);
+        Library:AddGradient(RowInner, 'BackgroundColor');
+
+        local RowLabel = Library:CreateLabel({
+            Position = UDim2.new(0, 8, 0, 0);
+            Size = UDim2.new(1, -16, 1, 0);
+            Text = '';
+            TextSize = 14;
+            TextXAlignment = Enum.TextXAlignment.Left;
+            ZIndex = 245;
+            Parent = RowInner;
+        }, true);
+
+        RowOuter.InputBegan:Connect(function(Input)
+            if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+                CommandModal.SelectedIndex = Index;
+                CommandModal:Accept();
+            end;
+        end);
+
+        ResultRows[Index] = {
+            Outer = RowOuter;
+            Inner = RowInner;
+            Label = RowLabel;
+        };
+    end;
+
+    function CommandModal:SetItems(Items)
+        self.Items = {};
+
+        for _, Item in next, Items or {} do
+            if type(Item) == 'string' then
+                table.insert(self.Items, {
+                    Text = Item;
+                    Value = Item;
+                });
+            elseif type(Item) == 'table' then
+                table.insert(self.Items, {
+                    Text = Item.Text or Item.Name or tostring(Item.Value);
+                    Value = Item.Value or Item.Text or Item.Name;
+                    Callback = Item.Callback or Item.Func;
+                });
+            end;
+        end;
+
+        self:Refresh();
+    end;
+
+    function CommandModal:SetSelectedIndex(Index)
+        if #self.Filtered == 0 then
+            self.SelectedIndex = 1;
+        else
+            self.SelectedIndex = ((Index - 1) % #self.Filtered) + 1;
+        end;
+
+        self:RefreshRows();
+    end;
+
+    function CommandModal:GetQuery()
+        return InputBox.Text or '';
+    end;
+
+    function CommandModal:Refresh()
+        local Query = self:GetQuery():lower();
+        self.Filtered = {};
+
+        for _, Item in next, self.Items do
+            if Query == '' or Item.Text:lower():find(Query, 1, true) then
+                table.insert(self.Filtered, Item);
+            end;
+        end;
+
+        if self.SelectedIndex > #self.Filtered then
+            self.SelectedIndex = 1;
+        end;
+
+        self:RefreshRows();
+        self:RefreshGhost();
+    end;
+
+    function CommandModal:RefreshRows()
+        for Index, Row in next, ResultRows do
+            local Item = self.Filtered[Index];
+            local Selected = Index == self.SelectedIndex;
+            Row.Outer.Visible = Item ~= nil;
+
+            if Item then
+                Row.Label.Text = Item.Text;
+                Row.Inner.BackgroundColor3 = Selected and Library.ControlColor or Library.BackgroundColor;
+                Row.Label.TextColor3 = Selected and Library.AccentColor or Library.FontColor;
+                Library:SetGradientColor(Row.Inner, Selected and 'ControlColor' or 'BackgroundColor');
+
+                if Library.RegistryMap[Row.Inner] then
+                    Library.RegistryMap[Row.Inner].Properties.BackgroundColor3 = Selected and 'ControlColor' or 'BackgroundColor';
+                end;
+
+                if Library.RegistryMap[Row.Label] then
+                    Library.RegistryMap[Row.Label].Properties.TextColor3 = Selected and 'AccentColor' or 'FontColor';
+                end;
+            end;
+        end;
+    end;
+
+    function CommandModal:RefreshGhost()
+        local Query = self:GetQuery();
+        local Top = self.Filtered[1];
+
+        if Query ~= '' and Top and Top.Text:lower():sub(1, #Query) == Query:lower() and #Top.Text > #Query then
+            local X = Library:GetTextBounds(Query, Library.Font, 14);
+            GhostLabel.Position = UDim2.new(0, 8 + X, 0, 0);
+            GhostLabel.Text = Top.Text:sub(#Query + 1);
+        else
+            GhostLabel.Text = '';
+        end;
+    end;
+
+    function CommandModal:Autocomplete()
+        local Top = self.Filtered[1];
+        if Top then
+            InputBox.Text = Top.Text;
+            InputBox.CursorPosition = #InputBox.Text + 1;
+            self.SelectedIndex = 1;
+            self:Refresh();
+        end;
+    end;
+
+    function CommandModal:Accept()
+        local Item = self.Filtered[self.SelectedIndex];
+        if not Item then
+            return;
+        end;
+
+        Library:SafeCallback(Item.Callback or self.Callback, Item.Value, Item);
+        self:SetVisible(false);
+    end;
+
+    function CommandModal:SetVisible(Visible)
+        ModalOuter.Visible = Visible;
+
+        if Visible then
+            InputBox:CaptureFocus();
+            self:Refresh();
+        else
+            InputBox:ReleaseFocus();
+        end;
+    end;
+
+    function CommandModal:Toggle()
+        self:SetVisible(not ModalOuter.Visible);
+    end;
+
+    function CommandModal:Destroy()
+        ModalOuter:Destroy();
+    end;
+
+    InputBox:GetPropertyChangedSignal('Text'):Connect(function()
+        CommandModal.SelectedIndex = 1;
+        CommandModal:Refresh();
+    end);
+
+    Library:GiveSignal(InputService.InputBegan:Connect(function(Input, Processed)
+        local CtrlDown = InputService:IsKeyDown(Enum.KeyCode.LeftControl) or InputService:IsKeyDown(Enum.KeyCode.RightControl);
+
+        if Input.UserInputType == Enum.UserInputType.Keyboard and Input.KeyCode == Enum.KeyCode.K and CtrlDown then
+            CommandModal:Toggle();
+            return;
+        end;
+
+        if not ModalOuter.Visible then
+            return;
+        end;
+
+        if Input.UserInputType ~= Enum.UserInputType.Keyboard then
+            return;
+        end;
+
+        if Input.KeyCode == Enum.KeyCode.Down then
+            CommandModal:SetSelectedIndex(CommandModal.SelectedIndex + 1);
+        elseif Input.KeyCode == Enum.KeyCode.Up then
+            CommandModal:SetSelectedIndex(CommandModal.SelectedIndex - 1);
+        elseif Input.KeyCode == Enum.KeyCode.Return or Input.KeyCode == Enum.KeyCode.KeypadEnter then
+            CommandModal:Accept();
+        elseif Input.KeyCode == Enum.KeyCode.Tab then
+            CommandModal:Autocomplete();
+        elseif Input.KeyCode == Enum.KeyCode.Escape then
+            CommandModal:SetVisible(false);
+        end;
+    end));
+
+    CommandModal.Holder = ModalOuter;
+    CommandModal.Input = InputBox;
+    CommandModal:SetItems(Info.Items or {});
+
+    return CommandModal;
+end;
+
 function Library:AddToolTip(InfoStr, HoverInstance)
     local X, Y = Library:GetTextBounds(InfoStr, Library.Font, 14);
     local Tooltip = Library:Create('Frame', {
