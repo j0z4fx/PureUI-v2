@@ -417,23 +417,53 @@ function Library:BuildShimmerSequence(Colors, Center, HalfWidth)
         return d > 0.5 and (1 - d) or d;
     end;
 
-    -- Cosine pulse: 1 at center, 0 at HalfWidth, nil beyond.
+    -- Cosine pulse brightness: 1 at center, 0 at HalfWidth, 0 beyond.
     local function bright(P)
         local d = wrapDist(P) / HalfWidth;
         if d >= 1 then return 0 end;
         return 0.5 - 0.5 * math.cos((1 - d) * math.pi);
     end;
 
-    -- Sample the full [0, 1] range. Endpoint samples (0 and 1) have identical
-    -- wrapped distance, so they always get the same color.
-    local N = 40;
-    local Keypoints = {};
-    for i = 0, N do
-        local P = i / N;
+    local function colorAt(P)
         local t = bright(P);
-        local C = Color3.new(lerp(Base.R, Hi.R, t), lerp(Base.G, Hi.G, t), lerp(Base.B, Hi.B, t));
+        return Color3.new(lerp(Base.R, Hi.R, t), lerp(Base.G, Hi.G, t), lerp(Base.B, Hi.B, t));
+    end;
+
+    -- ColorSequence caps at 32 keypoints. The line is flat Base except inside
+    -- the pulse (within HalfWidth of the center, including its wrapped copy), so
+    -- we only need: a base endpoint at 0, a handful of samples across each pulse
+    -- region that intersects [0,1], and a base endpoint at 1. Stays well under
+    -- the cap and keeps the pulse shape crisp instead of blurring it across a
+    -- coarse uniform grid.
+    local Keypoints = {};
+
+    local function push(P, C)
+        -- Clamp tiny float drift and skip duplicates at the same time.
+        if P < 0 then P = 0 elseif P > 1 then P = 1 end;
+        if #Keypoints > 0 and math.abs(Keypoints[#Keypoints].Time - P) < 1e-4 then
+            return;
+        end;
         Keypoints[#Keypoints + 1] = ColorSequenceKeypoint.new(P, C);
     end;
+
+    -- Pulse center plus its two wrapped neighbours cover every region the pulse
+    -- touches inside [0,1].
+    local Samples = 10; -- points per pulse region -> <= ~33 worst case; safe.
+    push(0, colorAt(0));
+    for _, Origin in next, { Center - 1, Center, Center + 1 } do
+        local Lo = Origin - HalfWidth;
+        local HiPos = Origin + HalfWidth;
+        -- Intersect [Lo, HiPos] with [0, 1].
+        if HiPos > 0 and Lo < 1 then
+            local A = math.max(0, Lo);
+            local B = math.min(1, HiPos);
+            for i = 0, Samples do
+                local P = A + (B - A) * (i / Samples);
+                push(P, colorAt(P));
+            end;
+        end;
+    end;
+    push(1, colorAt(1));
 
     return ColorSequence.new(Keypoints);
 end;
