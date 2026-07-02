@@ -6,7 +6,7 @@ local ThemeManager = {} do
 	ThemeManager.Library = nil
 	ThemeManager.DefaultTheme = 'Pure'
 	ThemeManager.BuiltInThemes = {
-		['Pure'] 			= { 1, httpService:JSONDecode('{"MainColor":"181818","AccentColor":"d87296","OutlineColor":"2d2d2d","BackgroundColor":"111111","FontColor":"f5eeee"}') },
+		['Pure'] 			= { 1, httpService:JSONDecode('{"MainColor":"181818","ControlColor":"1f1f1f","AccentColor":"d87296","OutlineColor":"343434","BackgroundColor":"101010","FontColor":"f5eeee"}') },
 		['Default'] 		= { 2, httpService:JSONDecode('{"FontColor":"ffffff","MainColor":"1c1c1c","AccentColor":"0055ff","BackgroundColor":"141414","OutlineColor":"323232"}') },
 		['BBot'] 			= { 3, httpService:JSONDecode('{"FontColor":"ffffff","MainColor":"1e1e1e","AccentColor":"7e48a3","BackgroundColor":"232323","OutlineColor":"141414"}') },
 		['Fatality']		= { 4, httpService:JSONDecode('{"FontColor":"ffffff","MainColor":"1e1842","AccentColor":"c50754","BackgroundColor":"191335","OutlineColor":"3c355d"}') },
@@ -26,11 +26,22 @@ local ThemeManager = {} do
 		-- custom themes are just regular dictionaries instead of an array with { index, dictionary }
 
 		local scheme = data[2]
-		for idx, col in next, customThemeData or scheme do
+		local activeTheme = customThemeData or scheme
+
+		for idx, col in next, activeTheme do
 			self.Library[idx] = Color3.fromHex(col)
 			
 			if Options[idx] then
 				Options[idx]:SetValueRGB(Color3.fromHex(col))
+			end
+		end
+
+		if not activeTheme.ControlColor and activeTheme.MainColor then
+			local controlColor = Color3.fromHex(activeTheme.MainColor)
+			self.Library.ControlColor = controlColor
+
+			if Options.ControlColor then
+				Options.ControlColor:SetValueRGB(controlColor)
 			end
 		end
 
@@ -39,7 +50,7 @@ local ThemeManager = {} do
 
 	function ThemeManager:ThemeUpdate()
 		-- This allows us to force apply themes without loading the themes tab :)
-		local options = { "FontColor", "MainColor", "AccentColor", "BackgroundColor", "OutlineColor" }
+		local options = { "FontColor", "MainColor", "ControlColor", "AccentColor", "BackgroundColor", "OutlineColor" }
 		for i, field in next, options do
 			if Options and Options[field] then
 				self.Library[field] = Options[field].Value
@@ -80,6 +91,7 @@ local ThemeManager = {} do
 	function ThemeManager:CreateThemeManager(groupbox)
 		groupbox:AddLabel('Background color'):AddColorPicker('BackgroundColor', { Default = self.Library.BackgroundColor });
 		groupbox:AddLabel('Main color')	:AddColorPicker('MainColor', { Default = self.Library.MainColor });
+		groupbox:AddLabel('Control color'):AddColorPicker('ControlColor', { Default = self.Library.ControlColor or self.Library.MainColor });
 		groupbox:AddLabel('Accent color'):AddColorPicker('AccentColor', { Default = self.Library.AccentColor });
 		groupbox:AddLabel('Outline color'):AddColorPicker('OutlineColor', { Default = self.Library.OutlineColor });
 		groupbox:AddLabel('Font color')	:AddColorPicker('FontColor', { Default = self.Library.FontColor });
@@ -164,7 +176,7 @@ local ThemeManager = {} do
 		end
 
 		local theme = {}
-		local fields = { "FontColor", "MainColor", "AccentColor", "BackgroundColor", "OutlineColor" }
+		local fields = { "FontColor", "MainColor", "ControlColor", "AccentColor", "BackgroundColor", "OutlineColor" }
 
 		for _, field in next, fields do
 			theme[field] = Options[field].Value:ToHex()

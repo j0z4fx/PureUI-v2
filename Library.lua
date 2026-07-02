@@ -31,9 +31,10 @@ local Library = {
 
     FontColor = Color3.fromRGB(245, 238, 238);
     MainColor = Color3.fromRGB(24, 24, 24);
-    BackgroundColor = Color3.fromRGB(17, 17, 17);
+    BackgroundColor = Color3.fromRGB(16, 16, 16);
+    ControlColor = Color3.fromRGB(31, 31, 31);
     AccentColor = Color3.fromRGB(216, 114, 150);
-    OutlineColor = Color3.fromRGB(45, 45, 45);
+    OutlineColor = Color3.fromRGB(52, 52, 52);
     RiskColor = Color3.fromRGB(255, 50, 50),
 
     Black = Color3.new(0, 0, 0);
@@ -192,7 +193,7 @@ end;
 function Library:AddToolTip(InfoStr, HoverInstance)
     local X, Y = Library:GetTextBounds(InfoStr, Library.Font, 14);
     local Tooltip = Library:Create('Frame', {
-        BackgroundColor3 = Library.MainColor,
+        BackgroundColor3 = Library.ControlColor,
         BorderColor3 = Library.OutlineColor,
 
         Size = UDim2.fromOffset(X + 5, Y + 4),
@@ -215,10 +216,10 @@ function Library:AddToolTip(InfoStr, HoverInstance)
     });
 
     Library:AddToRegistry(Tooltip, {
-        BackgroundColor3 = 'MainColor';
+        BackgroundColor3 = 'ControlColor';
         BorderColor3 = 'OutlineColor';
     });
-    Library:AddGradient(Tooltip, 'MainColor');
+    Library:AddGradient(Tooltip, 'ControlColor');
 
     Library:AddToRegistry(Label, {
         TextColor3 = 'FontColor',
@@ -630,7 +631,7 @@ do
         });
 
         local HueBoxInner = Library:Create('Frame', {
-            BackgroundColor3 = Library.MainColor;
+            BackgroundColor3 = Library.ControlColor;
             BorderColor3 = Library.OutlineColor;
             BorderMode = Enum.BorderMode.Inset;
             Size = UDim2.new(1, 0, 1, 0);
@@ -853,10 +854,10 @@ do
         Library:AddGradient(Highlight, 'AccentColor', 0);
         Library:AddToRegistry(SatVibMapInner, { BackgroundColor3 = 'BackgroundColor'; BorderColor3 = 'OutlineColor'; });
 
-        Library:AddToRegistry(HueBoxInner, { BackgroundColor3 = 'MainColor'; BorderColor3 = 'OutlineColor'; });
-        Library:AddToRegistry(RgbBoxBase.Frame, { BackgroundColor3 = 'MainColor'; BorderColor3 = 'OutlineColor'; });
-        Library:AddGradient(HueBoxInner, 'MainColor');
-        Library:AddGradient(RgbBoxBase.Frame, 'MainColor');
+        Library:AddToRegistry(HueBoxInner, { BackgroundColor3 = 'ControlColor'; BorderColor3 = 'OutlineColor'; });
+        Library:AddToRegistry(RgbBoxBase.Frame, { BackgroundColor3 = 'ControlColor'; BorderColor3 = 'OutlineColor'; });
+        Library:AddGradient(HueBoxInner, 'ControlColor');
+        Library:AddGradient(RgbBoxBase.Frame, 'ControlColor');
         Library:AddToRegistry(RgbBox, { TextColor3 = 'FontColor', });
         Library:AddToRegistry(HueBox, { TextColor3 = 'FontColor', });
 
@@ -1092,7 +1093,7 @@ do
         });
 
         local PickInner = Library:Create('Frame', {
-            BackgroundColor3 = Library.BackgroundColor;
+            BackgroundColor3 = Library.ControlColor;
             BorderColor3 = Library.OutlineColor;
             BorderMode = Enum.BorderMode.Inset;
             Size = UDim2.new(1, 0, 1, 0);
@@ -1101,10 +1102,10 @@ do
         });
 
         Library:AddToRegistry(PickInner, {
-            BackgroundColor3 = 'BackgroundColor';
+            BackgroundColor3 = 'ControlColor';
             BorderColor3 = 'OutlineColor';
         });
-        Library:AddGradient(PickInner, 'BackgroundColor');
+        Library:AddGradient(PickInner, 'ControlColor');
 
         local DisplayLabel = Library:CreateLabel({
             Size = UDim2.new(1, 0, 1, 0);
@@ -1129,7 +1130,7 @@ do
         end);
 
         local ModeSelectInner = Library:Create('Frame', {
-            BackgroundColor3 = Library.BackgroundColor;
+            BackgroundColor3 = Library.ControlColor;
             BorderColor3 = Library.OutlineColor;
             BorderMode = Enum.BorderMode.Inset;
             Size = UDim2.new(1, 0, 1, 0);
@@ -1138,10 +1139,10 @@ do
         });
 
         Library:AddToRegistry(ModeSelectInner, {
-            BackgroundColor3 = 'BackgroundColor';
+            BackgroundColor3 = 'ControlColor';
             BorderColor3 = 'OutlineColor';
         });
-        Library:AddGradient(ModeSelectInner, 'BackgroundColor');
+        Library:AddGradient(ModeSelectInner, 'ControlColor');
 
         Library:Create('UIListLayout', {
             FillDirection = Enum.FillDirection.Vertical;
@@ -1497,7 +1498,7 @@ do
             });
 
             local Inner = Library:Create('Frame', {
-                BackgroundColor3 = Library.MainColor;
+                BackgroundColor3 = Library.ControlColor;
                 BorderColor3 = Library.OutlineColor;
                 BorderMode = Enum.BorderMode.Inset;
                 Size = UDim2.new(1, 0, 1, 0);
@@ -1518,10 +1519,10 @@ do
             });
 
             Library:AddToRegistry(Inner, {
-                BackgroundColor3 = 'MainColor';
+                BackgroundColor3 = 'ControlColor';
                 BorderColor3 = 'OutlineColor';
             });
-            Library:AddGradient(Inner, 'MainColor');
+            Library:AddGradient(Inner, 'ControlColor');
 
             Library:OnHighlight(Outer, Outer,
                 { BorderColor3 = 'AccentColor' },
@@ -1662,7 +1663,7 @@ do
         });
 
         local DividerInner = Library:Create('Frame', {
-            BackgroundColor3 = Library.MainColor;
+            BackgroundColor3 = Library.ControlColor;
             BorderColor3 = Library.OutlineColor;
             BorderMode = Enum.BorderMode.Inset;
             Size = UDim2.new(1, 0, 1, 0);
@@ -1675,10 +1676,10 @@ do
         });
 
         Library:AddToRegistry(DividerInner, {
-            BackgroundColor3 = 'MainColor';
+            BackgroundColor3 = 'ControlColor';
             BorderColor3 = 'OutlineColor';
         });
-        Library:AddGradient(DividerInner, 'MainColor');
+        Library:AddGradient(DividerInner, 'ControlColor');
 
         Groupbox:AddBlank(9);
         Groupbox:Resize();
@@ -1718,7 +1719,7 @@ do
         });
 
         local TextBoxInner = Library:Create('Frame', {
-            BackgroundColor3 = Library.MainColor;
+            BackgroundColor3 = Library.ControlColor;
             BorderColor3 = Library.OutlineColor;
             BorderMode = Enum.BorderMode.Inset;
             Size = UDim2.new(1, 0, 1, 0);
@@ -1727,7 +1728,7 @@ do
         });
 
         Library:AddToRegistry(TextBoxInner, {
-            BackgroundColor3 = 'MainColor';
+            BackgroundColor3 = 'ControlColor';
             BorderColor3 = 'OutlineColor';
         });
 
@@ -1740,7 +1741,7 @@ do
             Library:AddToolTip(Info.Tooltip, TextBoxOuter)
         end
 
-        Library:AddGradient(TextBoxInner, 'MainColor');
+        Library:AddGradient(TextBoxInner, 'ControlColor');
 
         local Container = Library:Create('Frame', {
             BackgroundTransparency = 1;
@@ -1890,7 +1891,7 @@ do
         });
 
         local ToggleInner = Library:Create('Frame', {
-            BackgroundColor3 = Library.MainColor;
+            BackgroundColor3 = Library.ControlColor;
             BorderColor3 = Library.OutlineColor;
             BorderMode = Enum.BorderMode.Inset;
             Size = UDim2.new(1, 0, 1, 0);
@@ -1899,10 +1900,10 @@ do
         });
 
         Library:AddToRegistry(ToggleInner, {
-            BackgroundColor3 = 'MainColor';
+            BackgroundColor3 = 'ControlColor';
             BorderColor3 = 'OutlineColor';
         });
-        Library:AddGradient(ToggleInner, 'MainColor');
+        Library:AddGradient(ToggleInner, 'ControlColor');
 
         local ToggleLabel = Library:CreateLabel({
             Size = UDim2.new(0, 216, 1, 0);
@@ -1943,12 +1944,12 @@ do
         end
 
         function Toggle:Display()
-            ToggleInner.BackgroundColor3 = Toggle.Value and Library.AccentColor or Library.MainColor;
+            ToggleInner.BackgroundColor3 = Toggle.Value and Library.AccentColor or Library.ControlColor;
             ToggleInner.BorderColor3 = Toggle.Value and Library.AccentColorDark or Library.OutlineColor;
 
-            Library.RegistryMap[ToggleInner].Properties.BackgroundColor3 = Toggle.Value and 'AccentColor' or 'MainColor';
+            Library.RegistryMap[ToggleInner].Properties.BackgroundColor3 = Toggle.Value and 'AccentColor' or 'ControlColor';
             Library.RegistryMap[ToggleInner].Properties.BorderColor3 = Toggle.Value and 'AccentColorDark' or 'OutlineColor';
-            Library:SetGradientColor(ToggleInner, Toggle.Value and 'AccentColor' or 'MainColor');
+            Library:SetGradientColor(ToggleInner, Toggle.Value and 'AccentColor' or 'ControlColor');
         end;
 
         function Toggle:OnChanged(Func)
@@ -2049,7 +2050,7 @@ do
         });
 
         local SliderInner = Library:Create('Frame', {
-            BackgroundColor3 = Library.MainColor;
+            BackgroundColor3 = Library.ControlColor;
             BorderColor3 = Library.OutlineColor;
             BorderMode = Enum.BorderMode.Inset;
             Size = UDim2.new(1, 0, 1, 0);
@@ -2058,10 +2059,10 @@ do
         });
 
         Library:AddToRegistry(SliderInner, {
-            BackgroundColor3 = 'MainColor';
+            BackgroundColor3 = 'ControlColor';
             BorderColor3 = 'OutlineColor';
         });
-        Library:AddGradient(SliderInner, 'MainColor');
+        Library:AddGradient(SliderInner, 'ControlColor');
 
         local Fill = Library:Create('Frame', {
             BackgroundColor3 = Library.AccentColor;
@@ -2264,7 +2265,7 @@ do
         });
 
         local DropdownInner = Library:Create('Frame', {
-            BackgroundColor3 = Library.MainColor;
+            BackgroundColor3 = Library.ControlColor;
             BorderColor3 = Library.OutlineColor;
             BorderMode = Enum.BorderMode.Inset;
             Size = UDim2.new(1, 0, 1, 0);
@@ -2273,10 +2274,10 @@ do
         });
 
         Library:AddToRegistry(DropdownInner, {
-            BackgroundColor3 = 'MainColor';
+            BackgroundColor3 = 'ControlColor';
             BorderColor3 = 'OutlineColor';
         });
-        Library:AddGradient(DropdownInner, 'MainColor');
+        Library:AddGradient(DropdownInner, 'ControlColor');
 
         local DropdownArrow = Library:Create('ImageLabel', {
             AnchorPoint = Vector2.new(0, 0.5);
@@ -2332,7 +2333,7 @@ do
         DropdownOuter:GetPropertyChangedSignal('AbsolutePosition'):Connect(RecalculateListPosition);
 
         local ListInner = Library:Create('Frame', {
-            BackgroundColor3 = Library.MainColor;
+            BackgroundColor3 = Library.ControlColor;
             BorderColor3 = Library.OutlineColor;
             BorderMode = Enum.BorderMode.Inset;
             BorderSizePixel = 0;
@@ -2342,10 +2343,10 @@ do
         });
 
         Library:AddToRegistry(ListInner, {
-            BackgroundColor3 = 'MainColor';
+            BackgroundColor3 = 'ControlColor';
             BorderColor3 = 'OutlineColor';
         });
-        Library:AddGradient(ListInner, 'MainColor');
+        Library:AddGradient(ListInner, 'ControlColor');
 
         local Scrolling = Library:Create('ScrollingFrame', {
             BackgroundTransparency = 1;
@@ -2424,7 +2425,7 @@ do
                 Count = Count + 1;
 
                 local Button = Library:Create('Frame', {
-                    BackgroundColor3 = Library.MainColor;
+                    BackgroundColor3 = Library.ControlColor;
                     BorderColor3 = Library.OutlineColor;
                     BorderMode = Enum.BorderMode.Middle;
                     Size = UDim2.new(1, -1, 0, 20);
@@ -2434,10 +2435,10 @@ do
                 });
 
                 Library:AddToRegistry(Button, {
-                    BackgroundColor3 = 'MainColor';
+                    BackgroundColor3 = 'ControlColor';
                     BorderColor3 = 'OutlineColor';
                 });
-                Library:AddGradient(Button, 'MainColor');
+                Library:AddGradient(Button, 'ControlColor');
 
                 local ButtonLabel = Library:CreateLabel({
                     Active = false;
@@ -3102,10 +3103,10 @@ function Library:CreateWindow(...)
         });
 
         Library:AddToRegistry(TabButton, {
-            BackgroundColor3 = 'BackgroundColor';
+            BackgroundColor3 = 'ControlColor';
             BorderColor3 = 'OutlineColor';
         });
-        Library:AddGradient(TabButton, 'BackgroundColor');
+        Library:AddGradient(TabButton, 'ControlColor');
 
         local TabButtonLabel = Library:CreateLabel({
             Position = UDim2.new(0, 0, 0, 0);
@@ -3201,9 +3202,9 @@ function Library:CreateWindow(...)
 
         function Tab:HideTab()
             Blocker.BackgroundTransparency = 1;
-            TabButton.BackgroundColor3 = Library.BackgroundColor;
-            Library.RegistryMap[TabButton].Properties.BackgroundColor3 = 'BackgroundColor';
-            Library:SetGradientColor(TabButton, 'BackgroundColor');
+            TabButton.BackgroundColor3 = Library.ControlColor;
+            Library.RegistryMap[TabButton].Properties.BackgroundColor3 = 'ControlColor';
+            Library:SetGradientColor(TabButton, 'ControlColor');
             TabFrame.Visible = false;
         end;
 
@@ -3376,7 +3377,7 @@ function Library:CreateWindow(...)
                 local Tab = {};
 
                 local Button = Library:Create('Frame', {
-                    BackgroundColor3 = Library.MainColor;
+                    BackgroundColor3 = Library.ControlColor;
                     BorderColor3 = Color3.new(0, 0, 0);
                     Size = UDim2.new(0.5, 0, 1, 0);
                     ZIndex = 6;
@@ -3384,9 +3385,9 @@ function Library:CreateWindow(...)
                 });
 
                 Library:AddToRegistry(Button, {
-                    BackgroundColor3 = 'MainColor';
+                    BackgroundColor3 = 'ControlColor';
                 });
-                Library:AddGradient(Button, 'MainColor');
+                Library:AddGradient(Button, 'ControlColor');
 
                 local ButtonLabel = Library:CreateLabel({
                     Size = UDim2.new(1, 0, 1, 0);
@@ -3445,9 +3446,9 @@ function Library:CreateWindow(...)
                     Container.Visible = false;
                     Block.Visible = false;
 
-                    Button.BackgroundColor3 = Library.MainColor;
-                    Library.RegistryMap[Button].Properties.BackgroundColor3 = 'MainColor';
-                    Library:SetGradientColor(Button, 'MainColor');
+                    Button.BackgroundColor3 = Library.ControlColor;
+                    Library.RegistryMap[Button].Properties.BackgroundColor3 = 'ControlColor';
+                    Library:SetGradientColor(Button, 'ControlColor');
                 end;
 
                 function Tab:Resize()
