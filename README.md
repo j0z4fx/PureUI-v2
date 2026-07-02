@@ -64,6 +64,8 @@ PlayerList:AddDropdown('Disposition', {
 
 The player list window is separate from the main menu. The top section shows players with profile pictures, keeps the local player pinned to the top, and includes search by display name or username. Prefix the search with `@` to search usernames only. The bottom third is reserved for compact action controls. Action callbacks receive the selected player.
 
+Player action toggles and dropdowns store values per target. If you set one player to `Enemy`, selecting another player will show that player's own saved value or the control default.
+
 ### Command Modal
 
 ```lua
@@ -78,6 +80,17 @@ local CommandModal = Library:CreateCommandModal({
 ```
 
 Press `Ctrl+K` to open the command modal. Type to filter suggestions, use the arrow keys to move selection, press `Enter` to select, and press `Tab` to autocomplete the top result. Arrow navigation auto-scrolls the suggestion list, and a half-typed command is restored for 20 seconds after closing the modal.
+
+### Infinite Yield Wrapper
+
+```lua
+local CommandModal = Library:CreateInfiniteYieldCommandModal({
+    Title = 'Infinite Yield',
+    Placeholder = 'Run command...',
+})
+```
+
+The wrapper loads Infinite Yield, hides its default command menu, feeds IY commands into the Pure command modal, and executes selected or typed commands through IY's `execCmd`. IY utility windows and later external tool UIs are restyled with the Pure theme where possible.
 
 ## Interface Preview
 <img src="https://i.imgur.com/qs0Hqc6.png" />

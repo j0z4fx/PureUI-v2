@@ -698,6 +698,8 @@ function Library:CreateCommandModal(Info)
                     Text = Item.Text or Item.Name or tostring(Item.Value);
                     Value = Item.Value or Item.Text or Item.Name;
                     Callback = Item.Callback or Item.Func;
+                    Search = Item.Search;
+                    Description = Item.Description or Item.Desc;
                 });
             end;
         end;
@@ -730,7 +732,14 @@ function Library:CreateCommandModal(Info)
         self.Filtered = {};
 
         for _, Item in next, self.Items do
-            if Query == '' or Item.Text:lower():find(Query, 1, true) then
+            local Matches;
+            if type(Info.Filter) == 'function' then
+                Matches = Info.Filter(Item, self:GetQuery());
+            else
+                Matches = Query == '' or Item.Text:lower():find(Query, 1, true);
+            end;
+
+            if Matches then
                 table.insert(self.Filtered, Item);
             end;
         end;
@@ -798,12 +807,18 @@ function Library:CreateCommandModal(Info)
     end;
 
     function CommandModal:Accept()
+        local Query = self:GetQuery();
         local Item = self.Filtered[self.SelectedIndex];
         if not Item then
+            if Info.AllowRawAccept and Query:gsub('%s+', '') ~= '' then
+                Library:SafeCallback(self.Callback, Query, nil, Query);
+                self:SetVisible(false);
+            end;
+
             return;
         end;
 
-        Library:SafeCallback(Item.Callback or self.Callback, Item.Value, Item);
+        Library:SafeCallback(Item.Callback or self.Callback, Item.Value, Item, Query);
         self:SetVisible(false);
     end;
 
@@ -889,6 +904,318 @@ function Library:CreateCommandModal(Info)
     CommandModal:SetItems(Info.Items or {});
 
     return CommandModal;
+end;
+
+function Library:StyleExternalInstance(Instance)
+    pcall(function()
+        if Instance:IsA('TextLabel') or Instance:IsA('TextButton') or Instance:IsA('TextBox') then
+            Instance.Font = Library.Font;
+            Instance.TextColor3 = Library.FontColor;
+            Instance.TextStrokeTransparency = 1;
+
+            if Instance:IsA('TextBox') then
+                Instance.PlaceholderColor3 = Library:GetDarkerColor(Library.FontColor);
+            end;
+        end;
+
+        if Instance:IsA('TextButton') or Instance:IsA('TextBox') then
+            Instance.BackgroundColor3 = Library.ControlColor;
+            Instance.BorderColor3 = Library.OutlineColor;
+            Instance.BorderSizePixel = math.max(Instance.BorderSizePixel, 1);
+
+            if not Instance:FindFirstChild('PureGradient') then
+                Library:AddGradient(Instance, 'ControlColor');
+            end;
+        elseif Instance:IsA('ScrollingFrame') then
+            Instance.BackgroundColor3 = Library.BackgroundColor;
+            Instance.BorderColor3 = Library.OutlineColor;
+            Instance.ScrollBarImageColor3 = Library.AccentColor;
+            Instance.ScrollBarThickness = math.clamp(Instance.ScrollBarThickness, 3, 5);
+        elseif Instance:IsA('Frame') and Instance.BackgroundTransparency < 1 then
+            local ColorName = Instance.AbsoluteSize.Y <= 4 and 'AccentColor' or 'MainColor';
+            Instance.BackgroundColor3 = Library[ColorName];
+            Instance.BorderColor3 = Library.OutlineColor;
+            Instance.BorderSizePixel = math.max(Instance.BorderSizePixel, 1);
+
+            if not Instance:FindFirstChild('PureGradient') then
+                Library:AddGradient(Instance, ColorName, ColorName == 'AccentColor' and 0 or 90, ColorName == 'AccentColor', ColorName == 'AccentColor');
+            end;
+        elseif Instance:IsA('UIStroke') then
+            Instance.Color = Library.OutlineColor;
+        end;
+    end);
+end;
+
+function Library:StyleExternalUiRoot(Root)
+    if not Root then
+        return;
+    end;
+
+    Library:StyleExternalInstance(Root);
+
+    for _, Descendant in next, Root:GetDescendants() do
+        Library:StyleExternalInstance(Descendant);
+    end;
+end;
+
+function Library:ShouldStyleExternalUi(Instance)
+    local Name = Instance.Name:lower();
+    return Name:find('simplespy', 1, true)
+        or Name:find('simple spy', 1, true)
+        or Name:find('dex', 1, true)
+        or Name:find('cobalt', 1, true)
+        or Name:find('remote', 1, true)
+        or Name:find('logger', 1, true);
+end;
+
+function Library:WatchExternalUi()
+    if Library.ExternalUiWatcher then
+        return;
+    end;
+
+    local function WatchParent(Parent)
+        if not Parent then
+            return;
+        end;
+
+        local Connection = Parent.DescendantAdded:Connect(function(Instance)
+            if not (Instance:IsA('ScreenGui') or Instance:IsA('Frame')) then
+                return;
+            end;
+
+            task.delay(0.25, function()
+                if Instance.Parent and Library:ShouldStyleExternalUi(Instance) then
+                    Library:StyleExternalUiRoot(Instance);
+                end;
+            end);
+        end);
+
+        Library:GiveSignal(Connection);
+    end;
+
+    WatchParent(CoreGui);
+    WatchParent(LocalPlayer:FindFirstChildOfClass('PlayerGui'));
+    Library.ExternalUiWatcher = true;
+end;
+
+function Library:GetInfiniteYieldCommands()
+    local Items = {};
+    local Seen = {};
+    local Env = getgenv();
+
+    local function AddItem(Text, Value, Search, Description)
+        Text = tostring(Text or '');
+        Value = tostring(Value or Text);
+
+        if Text == '' or Seen[Text] then
+            return;
+        end;
+
+        Seen[Text] = true;
+        table.insert(Items, {
+            Text = Text;
+            Value = Value;
+            Search = (Search or Text):lower();
+            Description = Description;
+        });
+    end;
+
+    if type(Env.CMDs) == 'table' then
+        for _, Command in next, Env.CMDs do
+            local Text = tostring(Command.NAME or '');
+            local Value = Text:match('^%s*([^%s/]+)') or Text;
+            AddItem(Text, Value, table.concat({ Text, tostring(Command.DESC or '') }, ' '), Command.DESC);
+        end;
+    end;
+
+    if type(Env.cmds) == 'table' then
+        for _, Command in next, Env.cmds do
+            local Name = tostring(Command.NAME or '');
+            local Aliases = type(Command.ALIAS) == 'table' and table.concat(Command.ALIAS, ' ') or '';
+            AddItem(Name, Name, Name .. ' ' .. Aliases, nil);
+        end;
+    end;
+
+    table.sort(Items, function(A, B)
+        return A.Text:lower() < B.Text:lower();
+    end);
+
+    return Items;
+end;
+
+function Library:ApplyInfiniteYieldStyle(Info)
+    Info = Info or {};
+    local Env = getgenv();
+
+    if Env.Holder then
+        pcall(function()
+            Env.Holder.Visible = false;
+        end);
+    end;
+
+    for _, RootName in next, {
+        'Notification';
+        'logs';
+        'chat';
+        'join';
+        'KeybindsFrame';
+        'KeybindEditor';
+        'PositionsFrame';
+        'AliasesFrame';
+        'PluginsFrame';
+        'PluginEditor';
+        'ToPartFrame';
+    } do
+        local Root = Env[RootName];
+        if typeof(Root) == 'Instance' then
+            Library:StyleExternalUiRoot(Root);
+        end;
+    end;
+
+    if Info.StyleParent ~= false and typeof(Env.PARENT) == 'Instance' then
+        Library:StyleExternalUiRoot(Env.PARENT);
+    end;
+
+    if Info.UsePureNotifications ~= false and type(Env.notify) == 'function' and not Env.PureOriginalIYNotify then
+        Env.PureOriginalIYNotify = Env.notify;
+        Env.notify = function(Title, Text, Length)
+            local Message = Text and (tostring(Title) .. ': ' .. tostring(Text)) or tostring(Title);
+            Library:Notify(Message, Length or 3);
+        end;
+    end;
+
+    if Info.StyleExternalUis ~= false then
+        Library:WatchExternalUi();
+    end;
+end;
+
+function Library:LoadInfiniteYield(Info)
+    Info = Info or {};
+
+    local Env = getgenv();
+    local HasRunner = type(Env.execCmd) == 'function' and type(Env.cmds) == 'table';
+
+    if Library.InfiniteYield and HasRunner and not Info.Reload then
+        return Library.InfiniteYield;
+    elseif Library.InfiniteYield and not HasRunner then
+        Library.InfiniteYield = nil;
+    end;
+
+    local Source = Info.Source or 'https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source';
+    local Wrapper = {
+        Source = Source;
+    };
+
+    function Wrapper:RefreshCommands()
+        self.Commands = Library:GetInfiniteYieldCommands();
+        return self.Commands;
+    end;
+
+    function Wrapper:GetCommandItems()
+        return self.Commands or self:RefreshCommands();
+    end;
+
+    function Wrapper:Execute(CommandText)
+        CommandText = tostring(CommandText or ''):gsub('^%s+', ''):gsub('%s+$', '');
+        if CommandText == '' then
+            return;
+        end;
+
+        local Env = getgenv();
+        if type(Env.execCmd) == 'function' then
+            Env.execCmd(CommandText, LocalPlayer, true);
+        else
+            Library:Notify('Infinite Yield command runner is not ready.', 3);
+        end;
+    end;
+
+    if (Env.IY_LOADED and not HasRunner) or Info.Reload then
+        Env.IY_LOADED = false;
+    end;
+
+    if not Env.IY_LOADED or Info.Reload or not HasRunner then
+        local Ok, Result = pcall(function()
+            local SourceCode = game:HttpGet(Source);
+            SourceCode = SourceCode:gsub('insts%[v%[1%]%]%[prop%] = val', 'pcall(function() insts[v[1]][prop] = val end)');
+            SourceCode = SourceCode .. [[
+
+pcall(function()
+    local Env = getgenv()
+    Env.IY_LOADED = IY_LOADED
+    Env.execCmd = execCmd
+    Env.cmds = cmds
+    Env.CMDs = CMDs
+    Env.notify = notify
+    Env.PARENT = PARENT
+    Env.Holder = Holder
+    Env.Notification = Notification
+    Env.logs = logs
+    Env.chat = chat
+    Env.join = join
+    Env.KeybindsFrame = KeybindsFrame
+    Env.KeybindEditor = KeybindEditor
+    Env.PositionsFrame = PositionsFrame
+    Env.AliasesFrame = AliasesFrame
+    Env.PluginsFrame = PluginsFrame
+    Env.PluginEditor = PluginEditor
+    Env.ToPartFrame = ToPartFrame
+end)
+]];
+            return loadstring(SourceCode)();
+        end);
+
+        if not Ok then
+            Library:Notify('Infinite Yield failed to load: ' .. tostring(Result), 6);
+        end;
+    end;
+
+    task.defer(function()
+        Wrapper:RefreshCommands();
+        Library:ApplyInfiniteYieldStyle(Info);
+    end);
+
+    Library.InfiniteYield = Wrapper;
+    return Wrapper;
+end;
+
+function Library:CreateInfiniteYieldCommandModal(Info)
+    Info = Info or {};
+
+    local Wrapper = Library:LoadInfiniteYield(Info);
+    local Modal;
+
+    Modal = Library:CreateCommandModal({
+        Title = Info.Title or 'Infinite Yield';
+        Placeholder = Info.Placeholder or 'Run Infinite Yield command...';
+        Position = Info.Position;
+        Size = Info.Size or UDim2.fromOffset(430, 280);
+        MaxRows = Info.MaxRows or 7;
+        Items = Wrapper:GetCommandItems();
+        AllowRawAccept = true;
+        Filter = function(Item, Query)
+            Query = tostring(Query or ''):lower():gsub('^%s+', '');
+            local CommandHead = Query:match('^(%S*)') or '';
+
+            if CommandHead == '' then
+                return true;
+            end;
+
+            local Search = tostring(Item.Search or Item.Text or ''):lower();
+            return Search:find(CommandHead, 1, true) ~= nil;
+        end;
+        Callback = function(Value, Item, Query)
+            local Raw = tostring(Query or ''):gsub('^%s+', ''):gsub('%s+$', '');
+            local CommandText = Raw ~= '' and Raw or tostring(Value or '');
+            Wrapper:Execute(CommandText);
+        end;
+    });
+
+    function Modal:RefreshInfiniteYieldCommands()
+        self:SetItems(Wrapper:RefreshCommands());
+    end;
+
+    Wrapper.Modal = Modal;
+    return Modal, Wrapper;
 end;
 
 function Library:AddToolTip(InfoStr, HoverInstance)
@@ -4426,6 +4753,22 @@ function Library:CreatePlayerList(Info)
         ActionsContainer.CanvasSize = UDim2.fromOffset(0, ActionsLayout.AbsoluteContentSize.Y + 2);
     end);
 
+    local function GetActionKey(Player)
+        if Player and Player.UserId then
+            return tostring(Player.UserId);
+        end;
+
+        return '__none';
+    end;
+
+    local function SyncActionsToSelectedPlayer()
+        for _, Action in next, PlayerList.Actions do
+            if type(Action) == 'table' and Action.SyncToPlayer then
+                Action:SyncToPlayer(PlayerList.SelectedPlayer);
+            end;
+        end;
+    end;
+
     function PlayerList:GetSelectedPlayer()
         return self.SelectedPlayer;
     end;
@@ -4440,6 +4783,8 @@ function Library:CreatePlayerList(Info)
                 end;
             end;
         end;
+
+        SyncActionsToSelectedPlayer();
     end;
 
     function PlayerList:Destroy()
@@ -4681,7 +5026,9 @@ function Library:CreatePlayerList(Info)
         Info = Info or {};
 
         local Toggle = {
+            Default = Info.Default == true;
             Value = Info.Default == true;
+            ValuesByPlayer = {};
             Callback = Info.Callback or function() end;
         };
 
@@ -4732,24 +5079,47 @@ function Library:CreatePlayerList(Info)
             Parent = ToggleOuter;
         }, true);
 
-        function Toggle:SetValue(Value)
-            self.Value = Value == true;
+        function Toggle:GetValue(Player)
+            local Key = GetActionKey(Player or PlayerList.SelectedPlayer);
+            local Value = self.ValuesByPlayer[Key];
+
+            if Value == nil then
+                return self.Default;
+            end;
+
+            return Value == true;
+        end;
+
+        function Toggle:SyncToPlayer(Player)
+            self.Value = self:GetValue(Player);
             ToggleFill.Visible = self.Value;
-            Library:SafeCallback(self.Callback, self.Value, PlayerList.SelectedPlayer, PlayerList);
+        end;
+
+        function Toggle:SetValue(Value, Player, Silent)
+            Player = Player or PlayerList.SelectedPlayer;
+            self.ValuesByPlayer[GetActionKey(Player)] = Value == true;
+
+            if Player == PlayerList.SelectedPlayer then
+                self:SyncToPlayer(Player);
+            end;
+
+            if not Silent then
+                Library:SafeCallback(self.Callback, self:GetValue(Player), Player, PlayerList);
+            end;
         end;
 
         function Toggle:OnChanged(Callback)
             self.Callback = Callback;
-            Callback(self.Value, PlayerList.SelectedPlayer, PlayerList);
+            Callback(self:GetValue(PlayerList.SelectedPlayer), PlayerList.SelectedPlayer, PlayerList);
         end;
 
         ToggleOuter.InputBegan:Connect(function(Input)
             if Input.UserInputType == Enum.UserInputType.MouseButton1 and not Library:MouseIsOverOpenedFrame() then
-                Toggle:SetValue(not Toggle.Value);
+                Toggle:SetValue(not Toggle:GetValue(PlayerList.SelectedPlayer), PlayerList.SelectedPlayer);
             end;
         end);
 
-        Toggle:SetValue(Toggle.Value);
+        Toggle:SyncToPlayer(PlayerList.SelectedPlayer);
         self.Actions[Idx] = Toggle;
         return Toggle;
     end;
@@ -4761,6 +5131,8 @@ function Library:CreatePlayerList(Info)
         local Dropdown = {
             Value = nil;
             Values = Info.Values;
+            Default = Info.Default or Info.Values[1];
+            ValuesByPlayer = {};
             Callback = Info.Callback or function() end;
             Open = false;
         };
@@ -4875,10 +5247,33 @@ function Library:CreatePlayerList(Info)
             Library.OpenedFrames[ListOuter] = true;
         end;
 
-        function Dropdown:SetValue(Value)
-            self.Value = Value;
-            ValueLabel.Text = tostring(Value or '--');
-            Library:SafeCallback(self.Callback, self.Value, PlayerList.SelectedPlayer, PlayerList);
+        function Dropdown:GetValue(Player)
+            local Key = GetActionKey(Player or PlayerList.SelectedPlayer);
+            local Value = self.ValuesByPlayer[Key];
+
+            if Value == nil then
+                return self.Default;
+            end;
+
+            return Value;
+        end;
+
+        function Dropdown:SyncToPlayer(Player)
+            self.Value = self:GetValue(Player);
+            ValueLabel.Text = tostring(self.Value or '--');
+        end;
+
+        function Dropdown:SetValue(Value, Player, Silent)
+            Player = Player or PlayerList.SelectedPlayer;
+            self.ValuesByPlayer[GetActionKey(Player)] = Value;
+
+            if Player == PlayerList.SelectedPlayer then
+                self:SyncToPlayer(Player);
+            end;
+
+            if not Silent then
+                Library:SafeCallback(self.Callback, self:GetValue(Player), Player, PlayerList);
+            end;
         end;
 
         function Dropdown:Close()
@@ -4892,7 +5287,7 @@ function Library:CreatePlayerList(Info)
 
         function Dropdown:OnChanged(Callback)
             self.Callback = Callback;
-            Callback(self.Value, PlayerList.SelectedPlayer, PlayerList);
+            Callback(self:GetValue(PlayerList.SelectedPlayer), PlayerList.SelectedPlayer, PlayerList);
         end;
 
         for _, Value in next, Dropdown.Values do
@@ -4924,7 +5319,7 @@ function Library:CreatePlayerList(Info)
 
             Button.InputBegan:Connect(function(Input)
                 if Input.UserInputType == Enum.UserInputType.MouseButton1 then
-                    Dropdown:SetValue(Value);
+                    Dropdown:SetValue(Value, PlayerList.SelectedPlayer);
                     Close();
                 end;
             end);
@@ -4952,7 +5347,7 @@ function Library:CreatePlayerList(Info)
             end;
         end);
 
-        Dropdown:SetValue(Info.Default or Dropdown.Values[1]);
+        Dropdown:SyncToPlayer(PlayerList.SelectedPlayer);
         self.Actions[Idx] = Dropdown;
         return Dropdown;
     end;
