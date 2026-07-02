@@ -2314,19 +2314,35 @@ do
         });
         Library:AddGradient(DropdownInner, 'ControlColor');
 
-        local DropdownArrow = Library:Create('ImageLabel', {
-            AnchorPoint = Vector2.new(0, 0.5);
+        local DropdownIconFrame = Library:Create('Frame', {
+            AnchorPoint = Vector2.new(1, 0);
             BackgroundTransparency = 1;
-            Position = UDim2.new(1, -16, 0.5, 0);
-            Size = UDim2.new(0, 12, 0, 12);
-            Image = 'http://www.roblox.com/asset/?id=6282522798';
+            Position = UDim2.new(1, -4, 0, 0);
+            Size = UDim2.new(0, 14, 1, 0);
             ZIndex = 8;
             Parent = DropdownInner;
         });
 
+        local DropdownPlus = Library:CreateLabel({
+            Size = UDim2.new(1, 0, 1, 0);
+            Text = '+';
+            TextSize = 16;
+            ZIndex = 9;
+            Parent = DropdownIconFrame;
+        });
+
+        local DropdownMinus = Library:CreateLabel({
+            Size = UDim2.new(1, 0, 1, 0);
+            Text = '-';
+            TextSize = 16;
+            TextTransparency = 1;
+            ZIndex = 9;
+            Parent = DropdownIconFrame;
+        });
+
         local ItemList = Library:CreateLabel({
             Position = UDim2.new(0, 5, 0, 0);
-            Size = UDim2.new(1, -5, 1, 0);
+            Size = UDim2.new(1, -22, 1, 0);
             TextSize = 14;
             Text = '--';
             TextXAlignment = Enum.TextXAlignment.Left;
@@ -2575,14 +2591,16 @@ do
             ListInner.BackgroundTransparency = 1;
             Library.OpenedFrames[ListOuter] = true;
             Library:Tween(ListInner, 0.12, { BackgroundTransparency = 0 });
-            Library:Tween(DropdownArrow, 0.12, { Rotation = 180 });
+            Library:Tween(DropdownPlus, 0.1, { TextTransparency = 1 });
+            Library:Tween(DropdownMinus, 0.1, { TextTransparency = 0 });
         end;
 
         function Dropdown:CloseDropdown()
             Dropdown.Open = false;
             Library.OpenedFrames[ListOuter] = nil;
             Library:Tween(ListInner, 0.1, { BackgroundTransparency = 1 });
-            Library:Tween(DropdownArrow, 0.12, { Rotation = 0 });
+            Library:Tween(DropdownPlus, 0.1, { TextTransparency = 0 });
+            Library:Tween(DropdownMinus, 0.1, { TextTransparency = 1 });
 
             task.delay(0.1, function()
                 if not Dropdown.Open then
