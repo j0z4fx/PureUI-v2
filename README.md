@@ -54,8 +54,8 @@ PlayerList:AddToggle('SpectatePlayer', {
 })
 
 PlayerList:AddDropdown('Disposition', {
-    Values = { 'Whitelist', 'Enemy', 'Sentry', 'Sentry (Passive)' },
-    Default = 'Whitelist',
+    Values = { 'None', 'Whitelist', 'Enemy', 'Sentry', 'Sentry (Passive)' },
+    Default = 'None',
     Callback = function(Value, Player)
         print('Disposition:', Value, Player and Player.Name)
     end,
@@ -64,7 +64,22 @@ PlayerList:AddDropdown('Disposition', {
 
 The player list window is separate from the main menu. The top section shows players with profile pictures, keeps the local player pinned to the top, and includes search by display name or username. Prefix the search with `@` to search usernames only. The bottom third is reserved for compact action controls. Action callbacks receive the selected player.
 
-Player action toggles and dropdowns store values per target. If you set one player to `Enemy`, selecting another player will show that player's own saved value or the control default.
+Player action toggles and dropdowns store values per target. Compact player-list dropdowns include `None` by default. If you set one player to `Enemy`, selecting another player will show that player's own saved value or `None`. Rows with a saved non-None state show a small accent marker, and that marker comes back when the same user rejoins.
+
+### ESP Preview
+
+```lua
+local Window = Library:CreateWindow({
+    Title = 'Example menu',
+    AutoShow = true,
+})
+
+local EspPreview = Window:AddEspPreview({
+    Title = 'ESP Preview',
+})
+```
+
+The ESP preview is a separate attached panel that follows the main window with a small gap. It uses the Pure UI style and shows a slowly rotating clone of the local player's avatar.
 
 ### Command Modal
 

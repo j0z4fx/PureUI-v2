@@ -1736,7 +1736,7 @@ function Library:AddGradient(Instance, Color, Rotation, Animated, Shimmer)
 
             Library.ShimmerGradients[Gradient] = {
                 Colors = Colors;
-                HalfWidth = 0.09;
+                HalfWidth = 0.18;
             };
         end;
         Library:AnimateGradient(Gradient, Rotation);
@@ -4798,7 +4798,7 @@ function Library:CreatePlayerList(Info)
         AnchorPoint = Info.AnchorPoint or Vector2.new(1, 0.5);
         BorderColor3 = Color3.new(0, 0, 0);
         Position = Info.Position or UDim2.new(1, -24, 0.5, 0);
-        Size = Info.Size or UDim2.fromOffset(300, 360);
+        Size = Info.Size or UDim2.fromOffset(300, 432);
         Visible = Info.Visible ~= false;
         ZIndex = 80;
         Parent = ScreenGui;
@@ -5000,6 +5000,25 @@ function Library:CreatePlayerList(Info)
         end;
     end;
 
+    function PlayerList:PlayerHasMarkedState(Player)
+        for _, Action in next, self.Actions do
+            if type(Action) == 'table' and Action.HasMarkedState and Action:HasMarkedState(Player) then
+                return true;
+            end;
+        end;
+
+        return false;
+    end;
+
+    function PlayerList:RefreshRowMarks()
+        for RowPlayer, Row in next, self.Rows do
+            local Marked = self:PlayerHasMarkedState(RowPlayer);
+            if Row.Marker then
+                Row.Marker.Visible = Marked;
+            end;
+        end;
+    end;
+
     function PlayerList:GetSelectedPlayer()
         return self.SelectedPlayer;
     end;
@@ -5016,6 +5035,7 @@ function Library:CreatePlayerList(Info)
         end;
 
         SyncActionsToSelectedPlayer();
+        self:RefreshRowMarks();
     end;
 
     function PlayerList:Destroy()
@@ -5095,7 +5115,7 @@ function Library:CreatePlayerList(Info)
         local Avatar = Library:Create('ImageLabel', {
             BackgroundColor3 = Library.ControlColor;
             BorderSizePixel = 0;
-            Position = UDim2.new(0, 4, 0, 4);
+            Position = UDim2.new(0, 7, 0, 4);
             Size = UDim2.new(0, 26, 0, 26);
             ZIndex = 86;
             Parent = RowInner;
@@ -5112,9 +5132,24 @@ function Library:CreatePlayerList(Info)
             end;
         end);
 
+        local Marker = Library:Create('Frame', {
+            BackgroundColor3 = Library.AccentColor;
+            BorderSizePixel = 0;
+            Position = UDim2.new(0, 2, 0, 5);
+            Size = UDim2.new(0, 2, 1, -10);
+            Visible = false;
+            ZIndex = 87;
+            Parent = RowInner;
+        });
+
+        Library:AddToRegistry(Marker, {
+            BackgroundColor3 = 'AccentColor';
+        }, true);
+        Library:AddGradient(Marker, 'AccentColor', 0, true, true);
+
         local NameLabel = Library:CreateLabel({
-            Position = UDim2.new(0, 36, 0, 0);
-            Size = UDim2.new(1, -42, 1, 0);
+            Position = UDim2.new(0, 39, 0, 0);
+            Size = UDim2.new(1, -45, 1, 0);
             Text = string.format('%s [%s]', Player.DisplayName, Player.Name);
             TextSize = 13;
             TextXAlignment = Enum.TextXAlignment.Left;
@@ -5131,8 +5166,11 @@ function Library:CreatePlayerList(Info)
         self.Rows[Player] = {
             Outer = RowOuter;
             Inner = RowInner;
+            Marker = Marker;
             NameLabel = NameLabel;
         };
+
+        Marker.Visible = self:PlayerHasMarkedState(Player);
     end;
 
     function PlayerList:Refresh()
@@ -5336,9 +5374,15 @@ function Library:CreatePlayerList(Info)
                 self:SyncToPlayer(Player);
             end;
 
+            PlayerList:RefreshRowMarks();
+
             if not Silent then
                 Library:SafeCallback(self.Callback, self:GetValue(Player), Player, PlayerList);
             end;
+        end;
+
+        function Toggle:HasMarkedState(Player)
+            return self:GetValue(Player) == true;
         end;
 
         function Toggle:OnChanged(Callback)
@@ -5361,10 +5405,24 @@ function Library:CreatePlayerList(Info)
         Info = Info or {};
         assert(Info.Values, 'PlayerList:AddDropdown: missing Values.');
 
+        local Values = {};
+        local HasNone = false;
+        for _, Value in next, Info.Values do
+            if tostring(Value):lower() == 'none' then
+                HasNone = true;
+            end;
+
+            table.insert(Values, Value);
+        end;
+
+        if not HasNone then
+            table.insert(Values, 1, 'None');
+        end;
+
         local Dropdown = {
             Value = nil;
-            Values = Info.Values;
-            Default = Info.Default or Info.Values[1];
+            Values = Values;
+            Default = Info.Default or 'None';
             ValuesByPlayer = {};
             Callback = Info.Callback or function() end;
             Open = false;
@@ -5504,9 +5562,16 @@ function Library:CreatePlayerList(Info)
                 self:SyncToPlayer(Player);
             end;
 
+            PlayerList:RefreshRowMarks();
+
             if not Silent then
                 Library:SafeCallback(self.Callback, self:GetValue(Player), Player, PlayerList);
             end;
+        end;
+
+        function Dropdown:HasMarkedState(Player)
+            local Value = self:GetValue(Player);
+            return Value ~= nil and tostring(Value):lower() ~= 'none';
         end;
 
         function Dropdown:Close()
@@ -5612,6 +5677,209 @@ function Library:CreatePlayerList(Info)
     Library:GiveSignal(PlayerRemovingConnection);
 
     return PlayerList;
+end;
+
+function Library:CreateEspPreview(Info)
+    Info = Info or {};
+    local Window = Info.Window;
+    local Holder = Info.Holder or (type(Window) == 'table' and Window.Holder);
+    assert(typeof(Holder) == 'Instance', 'CreateEspPreview: missing Window or Holder.');
+
+    local Spacing = Info.Spacing or 8;
+    local DesiredVisible = Info.Visible ~= false;
+    local Angle = 0;
+    local CurrentClone;
+    local CloneHeight = 5;
+
+    local Preview = {
+        Window = Window;
+        Holder = nil;
+        Connections = {};
+    };
+
+    local PreviewOuter = Library:Create('Frame', {
+        BackgroundColor3 = Color3.new(0, 0, 0);
+        BorderColor3 = Color3.new(0, 0, 0);
+        Position = UDim2.fromOffset(0, 0);
+        Size = Info.Size or UDim2.fromOffset(220, 260);
+        Visible = false;
+        ZIndex = 70;
+        Parent = ScreenGui;
+    });
+
+    Library:AddToRegistry(PreviewOuter, {
+        BorderColor3 = 'Black';
+    }, true);
+
+    local PreviewInner = Library:Create('Frame', {
+        BackgroundColor3 = Library.MainColor;
+        BorderColor3 = Library.OutlineColor;
+        BorderMode = Enum.BorderMode.Inset;
+        Size = UDim2.new(1, 0, 1, 0);
+        ZIndex = 71;
+        Parent = PreviewOuter;
+    });
+
+    Library:AddToRegistry(PreviewInner, {
+        BackgroundColor3 = 'MainColor';
+        BorderColor3 = 'OutlineColor';
+    }, true);
+    Library:AddGradient(PreviewInner, 'MainColor');
+
+    local AccentBar = Library:Create('Frame', {
+        BackgroundColor3 = Library.AccentColor;
+        BorderSizePixel = 0;
+        Size = UDim2.new(1, 0, 0, 2);
+        ZIndex = 74;
+        Parent = PreviewInner;
+    });
+
+    Library:AddToRegistry(AccentBar, {
+        BackgroundColor3 = 'AccentColor';
+    }, true);
+    Library:AddGradient(AccentBar, 'AccentColor', 0, true, true);
+
+    Library:CreateLabel({
+        Position = UDim2.new(0, 8, 0, 4);
+        Size = UDim2.new(1, -16, 0, 20);
+        Text = Info.Title or 'ESP Preview';
+        TextSize = 14;
+        TextXAlignment = Enum.TextXAlignment.Left;
+        ZIndex = 74;
+        Parent = PreviewInner;
+    }, true);
+
+    local ViewOuter = Library:Create('Frame', {
+        BackgroundColor3 = Library.BackgroundColor;
+        BorderColor3 = Library.OutlineColor;
+        BorderMode = Enum.BorderMode.Inset;
+        Position = UDim2.new(0, 8, 0, 30);
+        Size = UDim2.new(1, -16, 1, -38);
+        ZIndex = 72;
+        Parent = PreviewInner;
+    });
+
+    Library:AddToRegistry(ViewOuter, {
+        BackgroundColor3 = 'BackgroundColor';
+        BorderColor3 = 'OutlineColor';
+    }, true);
+    Library:AddGradient(ViewOuter, 'BackgroundColor');
+
+    local Viewport = Library:Create('ViewportFrame', {
+        Ambient = Color3.fromRGB(180, 180, 180);
+        BackgroundColor3 = Library.BackgroundColor;
+        BorderSizePixel = 0;
+        LightColor = Color3.fromRGB(255, 255, 255);
+        LightDirection = Vector3.new(-0.35, -1, -0.25);
+        Position = UDim2.new(0, 1, 0, 1);
+        Size = UDim2.new(1, -2, 1, -2);
+        ZIndex = 73;
+        Parent = ViewOuter;
+    });
+
+    Library:AddToRegistry(Viewport, {
+        BackgroundColor3 = 'BackgroundColor';
+    }, true);
+
+    local Camera = Instance.new('Camera');
+    Camera.Parent = Viewport;
+    Viewport.CurrentCamera = Camera;
+
+    local World = Instance.new('WorldModel');
+    World.Parent = Viewport;
+
+    local function UpdateAttachment()
+        PreviewOuter.Position = UDim2.fromOffset(
+            Holder.AbsolutePosition.X + Holder.AbsoluteSize.X + Spacing,
+            Holder.AbsolutePosition.Y
+        );
+
+        PreviewOuter.Visible = DesiredVisible and Holder.Visible;
+    end;
+
+    local function StripClone(Clone)
+        for _, Descendant in next, Clone:GetDescendants() do
+            if Descendant:IsA('BasePart') then
+                Descendant.Anchored = true;
+                Descendant.CanCollide = false;
+                Descendant.CastShadow = false;
+            elseif Descendant:IsA('Script') or Descendant:IsA('LocalScript') then
+                Descendant:Destroy();
+            end;
+        end;
+    end;
+
+    function Preview:RefreshAvatar()
+        World:ClearAllChildren();
+        CurrentClone = nil;
+
+        local Character = LocalPlayer.Character;
+        if not Character then
+            return;
+        end;
+
+        local OldArchivable = Character.Archivable;
+        Character.Archivable = true;
+        local Ok, Clone = pcall(Character.Clone, Character);
+        Character.Archivable = OldArchivable;
+
+        if not Ok or not Clone then
+            return;
+        end;
+
+        StripClone(Clone);
+        Clone.Parent = World;
+
+        local _, Size = Clone:GetBoundingBox();
+        CloneHeight = math.max(Size.Y, 4);
+        CurrentClone = Clone;
+
+        Clone:PivotTo(CFrame.new(0, CloneHeight / 2, 0));
+        local LookAt = Vector3.new(0, CloneHeight / 2, 0);
+        local Distance = math.max(CloneHeight * 1.35, Size.X * 2.1, 5);
+        Camera.CFrame = CFrame.lookAt(Vector3.new(0, CloneHeight * 0.55, Distance), LookAt);
+        Camera.FieldOfView = 38;
+    end;
+
+    function Preview:SetVisible(Visible)
+        DesiredVisible = Visible == true;
+        UpdateAttachment();
+    end;
+
+    function Preview:Destroy()
+        for _, Connection in next, self.Connections do
+            pcall(function()
+                Connection:Disconnect();
+            end);
+        end;
+
+        PreviewOuter:Destroy();
+    end;
+
+    table.insert(Preview.Connections, LocalPlayer.CharacterAdded:Connect(function()
+        task.wait(1);
+        Preview:RefreshAvatar();
+    end));
+
+    table.insert(Preview.Connections, RenderStepped:Connect(function(Delta)
+        UpdateAttachment();
+
+        if CurrentClone then
+            Angle = (Angle + (Delta * 0.7)) % (math.pi * 2);
+            CurrentClone:PivotTo(CFrame.new(0, CloneHeight / 2, 0) * CFrame.Angles(0, Angle, 0));
+        end;
+    end));
+
+    for _, Connection in next, Preview.Connections do
+        Library:GiveSignal(Connection);
+    end;
+
+    Preview.Holder = PreviewOuter;
+    Preview.Viewport = Viewport;
+    Preview:RefreshAvatar();
+    UpdateAttachment();
+
+    return Preview;
 end;
 
 function Library:CreateWindow(...)
@@ -6359,6 +6627,12 @@ function Library:CreateWindow(...)
     if Config.AutoShow then task.spawn(Library.Toggle) end
 
     Window.Holder = Outer;
+
+    function Window:AddEspPreview(Info)
+        Info = Info or {};
+        Info.Window = Window;
+        return Library:CreateEspPreview(Info);
+    end;
 
     return Window;
 end;
