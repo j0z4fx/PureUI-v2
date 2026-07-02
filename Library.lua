@@ -335,8 +335,9 @@ end;
 function Library:GetGradientSequence(Color)
     return ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-        ColorSequenceKeypoint.new(0.72, Color3.fromRGB(246, 246, 246)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(218, 218, 218)),
+        ColorSequenceKeypoint.new(0.56, Color3.fromRGB(247, 247, 247)),
+        ColorSequenceKeypoint.new(0.84, Color3.fromRGB(216, 216, 216)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(176, 176, 176)),
     });
 end;
 
@@ -369,6 +370,17 @@ function Library:SetGradientColor(Instance, Color)
     if Gradient then
         Gradient.Color = Library:GetGradientSequence(Color);
     end;
+end;
+
+function Library:Tween(Instance, Duration, Properties, EasingStyle, EasingDirection)
+    local Tween = TweenService:Create(
+        Instance,
+        TweenInfo.new(Duration or 0.12, EasingStyle or Enum.EasingStyle.Quad, EasingDirection or Enum.EasingDirection.Out),
+        Properties
+    );
+
+    Tween:Play();
+    return Tween;
 end;
 
 Library.AccentColorDark = Library:GetDarkerColor(Library.AccentColor);
@@ -1560,9 +1572,22 @@ do
                 return true
             end
 
+            Button.Outer.MouseEnter:Connect(function()
+                if Button.Locked then return end
+                Library:Tween(Button.Inner, 0.1, { BackgroundColor3 = Library:GetLighterColor(Library.ControlColor) });
+            end)
+
+            Button.Outer.MouseLeave:Connect(function()
+                local Reg = Library.RegistryMap[Button.Inner];
+                local ColorIdx = Reg and Reg.Properties.BackgroundColor3 or 'ControlColor';
+                Library:Tween(Button.Inner, 0.12, { BackgroundColor3 = Library[ColorIdx] or Library.ControlColor });
+            end)
+
             Button.Outer.InputBegan:Connect(function(Input)
                 if not ValidateClick(Input) then return end
                 if Button.Locked then return end
+
+                Library:Tween(Button.Inner, 0.06, { BackgroundColor3 = Library:GetDarkerColor(Library.ControlColor) });
 
                 if Button.DoubleClick then
                     Library:RemoveFromRegistry(Button.Label)
@@ -1589,6 +1614,13 @@ do
                 end
 
                 Library:SafeCallback(Button.Func);
+            end)
+
+            Button.Outer.InputEnded:Connect(function(Input)
+                if Input.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
+                local Reg = Library.RegistryMap[Button.Inner];
+                local ColorIdx = Reg and Reg.Properties.BackgroundColor3 or 'ControlColor';
+                Library:Tween(Button.Inner, 0.1, { BackgroundColor3 = Library[ColorIdx] or Library.ControlColor });
             end)
         end
 
@@ -1942,12 +1974,17 @@ do
         end
 
         function Toggle:Display()
-            ToggleInner.BackgroundColor3 = Toggle.Value and Library.AccentColor or Library.ControlColor;
-            ToggleInner.BorderColor3 = Toggle.Value and Library.AccentColorDark or Library.OutlineColor;
+            local BackgroundColor = Toggle.Value and Library.AccentColor or Library.ControlColor;
+            local BorderColor = Toggle.Value and Library.AccentColorDark or Library.OutlineColor;
 
             Library.RegistryMap[ToggleInner].Properties.BackgroundColor3 = Toggle.Value and 'AccentColor' or 'ControlColor';
             Library.RegistryMap[ToggleInner].Properties.BorderColor3 = Toggle.Value and 'AccentColorDark' or 'OutlineColor';
             Library:SetGradientColor(ToggleInner, Toggle.Value and 'AccentColor' or 'ControlColor');
+
+            Library:Tween(ToggleInner, 0.12, {
+                BackgroundColor3 = BackgroundColor;
+                BorderColor3 = BorderColor;
+            });
         end;
 
         function Toggle:OnChanged(Func)
@@ -2124,7 +2161,7 @@ do
             end
 
             local X = math.ceil(Library:MapValue(Slider.Value, Slider.Min, Slider.Max, 0, Slider.MaxSize));
-            Fill.Size = UDim2.new(0, X, 1, 0);
+            Library:Tween(Fill, 0.08, { Size = UDim2.new(0, X, 1, 0) });
 
             HideBorderRight.Visible = not (X == Slider.MaxSize or X == 0);
         end;
@@ -2533,15 +2570,26 @@ do
         end;
 
         function Dropdown:OpenDropdown()
+            Dropdown.Open = true;
             ListOuter.Visible = true;
+            ListInner.BackgroundTransparency = 1;
             Library.OpenedFrames[ListOuter] = true;
-            DropdownArrow.Rotation = 180;
+            Library:Tween(ListInner, 0.12, { BackgroundTransparency = 0 });
+            Library:Tween(DropdownArrow, 0.12, { Rotation = 180 });
         end;
 
         function Dropdown:CloseDropdown()
-            ListOuter.Visible = false;
+            Dropdown.Open = false;
             Library.OpenedFrames[ListOuter] = nil;
-            DropdownArrow.Rotation = 0;
+            Library:Tween(ListInner, 0.1, { BackgroundTransparency = 1 });
+            Library:Tween(DropdownArrow, 0.12, { Rotation = 0 });
+
+            task.delay(0.1, function()
+                if not Dropdown.Open then
+                    ListOuter.Visible = false;
+                    ListInner.BackgroundTransparency = 0;
+                end
+            end);
         end;
 
         function Dropdown:OnChanged(Func)
@@ -3059,7 +3107,7 @@ function Library:CreateWindow(...)
     });
 
     local TabListLayout = Library:Create('UIListLayout', {
-        Padding = UDim.new(0, Config.TabPadding);
+        Padding = UDim.new(0, 0);
         FillDirection = Enum.FillDirection.Horizontal;
         SortOrder = Enum.SortOrder.LayoutOrder;
         Parent = TabArea;
@@ -3084,18 +3132,34 @@ function Library:CreateWindow(...)
         WindowLabel.Text = Title;
     end;
 
+    local function ReflowTabs()
+        local Count = 0;
+
+        for _, _ in next, Window.Tabs do
+            Count = Count + 1;
+        end;
+
+        if Count == 0 then
+            return;
+        end;
+
+        for _, Tab in next, Window.Tabs do
+            Tab.Button.Size = UDim2.new(1 / Count, 0, 1, 0);
+        end;
+
+        TabListLayout:ApplyLayout();
+    end;
+
     function Window:AddTab(Name)
         local Tab = {
             Groupboxes = {};
             Tabboxes = {};
         };
 
-        local TabButtonWidth = Library:GetTextBounds(Name, Library.Font, 16);
-
         local TabButton = Library:Create('Frame', {
             BackgroundColor3 = Library.MainColor;
             BorderColor3 = Library.OutlineColor;
-            Size = UDim2.new(0, TabButtonWidth + 8 + 4, 1, 0);
+            Size = UDim2.new(1, 0, 1, 0);
             ZIndex = 1;
             Parent = TabArea;
         });
@@ -3191,18 +3255,18 @@ function Library:CreateWindow(...)
                 Tab:HideTab();
             end;
 
-            Blocker.BackgroundTransparency = 0;
-            TabButton.BackgroundColor3 = Library.ControlColor;
             Library.RegistryMap[TabButton].Properties.BackgroundColor3 = 'ControlColor';
             Library:SetGradientColor(TabButton, 'ControlColor');
+            Library:Tween(TabButton, 0.12, { BackgroundColor3 = Library.ControlColor });
+            Library:Tween(Blocker, 0.12, { BackgroundTransparency = 0 });
             TabFrame.Visible = true;
         end;
 
         function Tab:HideTab()
-            Blocker.BackgroundTransparency = 1;
-            TabButton.BackgroundColor3 = Library.MainColor;
             Library.RegistryMap[TabButton].Properties.BackgroundColor3 = 'MainColor';
             Library:SetGradientColor(TabButton, 'MainColor');
+            Library:Tween(TabButton, 0.12, { BackgroundColor3 = Library.MainColor });
+            Library:Tween(Blocker, 0.12, { BackgroundTransparency = 1 });
             TabFrame.Visible = false;
         end;
 
@@ -3433,20 +3497,27 @@ function Library:CreateWindow(...)
                     Container.Visible = true;
                     Block.Visible = true;
 
-                    Button.BackgroundColor3 = Library.ControlColor;
                     Library.RegistryMap[Button].Properties.BackgroundColor3 = 'ControlColor';
                     Library:SetGradientColor(Button, 'ControlColor');
+                    Library:Tween(Button, 0.12, { BackgroundColor3 = Library.ControlColor });
+                    Library:Tween(Block, 0.12, { BackgroundTransparency = 0 });
 
                     Tab:Resize();
                 end;
 
                 function Tab:Hide()
                     Container.Visible = false;
-                    Block.Visible = false;
 
-                    Button.BackgroundColor3 = Library.MainColor;
                     Library.RegistryMap[Button].Properties.BackgroundColor3 = 'MainColor';
                     Library:SetGradientColor(Button, 'MainColor');
+                    Library:Tween(Button, 0.12, { BackgroundColor3 = Library.MainColor });
+                    Library:Tween(Block, 0.12, { BackgroundTransparency = 1 });
+
+                    task.delay(0.12, function()
+                        if not Container.Visible then
+                            Block.Visible = false;
+                        end;
+                    end);
                 end;
 
                 function Tab:Resize()
@@ -3524,7 +3595,10 @@ function Library:CreateWindow(...)
             Tab:ShowTab();
         end;
 
+        Tab.Button = TabButton;
+
         Window.Tabs[Name] = Tab;
+        ReflowTabs();
         return Tab;
     end;
 
