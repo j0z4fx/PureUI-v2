@@ -1,13 +1,39 @@
 -- New example script written by wally
 -- You can suggest changes with a pull request or something
 
-local repo = 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/6e5c844/'
+local repo = 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/a624601/'
 local cacheBust = '?v=' .. tostring(os.time())
 
 local Library = loadstring(game:HttpGet(repo .. 'Library.lua' .. cacheBust))()
 local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua' .. cacheBust))()
 local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua' .. cacheBust))()
 local Players = game:GetService('Players')
+
+local CommandModal = Library:CreateCommandModal({
+    Title = 'Fruits',
+    Placeholder = 'Search fruits...',
+    Items = {
+        'Apple',
+        'Apricot',
+        'Banana',
+        'Blackberry',
+        'Blueberry',
+        'Cherry',
+        'Grape',
+        'Kiwi',
+        'Lemon',
+        'Mango',
+        'Orange',
+        'Peach',
+        'Pear',
+        'Pineapple',
+        'Strawberry',
+        'Watermelon',
+    },
+    Callback = function(Value)
+        Library:Notify('Selected fruit: ' .. tostring(Value), 2)
+    end,
+})
 
 local TargetInfo = Library:CreateTargetInfo({
     Player = Players.LocalPlayer,
