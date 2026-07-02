@@ -369,11 +369,11 @@ end;
 -- by AnimateGradient, which rebuilds the gradient's ColorSequence every frame
 -- so a bright pulse genuinely travels right -> left and wraps via modulo. This
 -- is seamless by construction: there is no clamped offset sweep to expose a
--- seam, and both endpoints (0 and 1) stay at the base accent so the pulse can
--- cross any boundary without popping.
+-- seam, and both endpoints (0 and 1) resolve to the target accent color so the
+-- pulse can cross any boundary without popping.
 
 function Library:GetShimmerColors(Color)
-    local Base = (typeof(Color) == 'Color3' and Color) or Library.AccentColor;
+    local Target = Library:ResolveColor(Color) or Library.AccentColor;
 
     local function Brighter(C, Amount)
         return Color3.fromRGB(
@@ -383,10 +383,32 @@ function Library:GetShimmerColors(Color)
         );
     end;
 
+    local Surface = Brighter(Target, 70);
+
+    local function Multiplier(Channel, SurfaceChannel)
+        if SurfaceChannel <= 0 then
+            return 1;
+        end;
+
+        return math.clamp(Channel / SurfaceChannel, 0, 1);
+    end;
+
     return {
-        Base = Base;
-        Hi = Brighter(Base, 90);
+        Target = Target;
+        Surface = Surface;
+        Base = Color3.new(
+            Multiplier(Target.R, Surface.R),
+            Multiplier(Target.G, Surface.G),
+            Multiplier(Target.B, Surface.B)
+        );
+        Hi = Color3.new(1, 1, 1);
     };
+end;
+
+function Library:ApplyShimmerSurface(Instance, Colors)
+    if Instance and Instance:IsA('GuiObject') then
+        Instance.BackgroundColor3 = Colors.Surface;
+    end;
 end;
 
 -- Build the ColorSequence for a pulse whose center may sit outside [0, 1].
@@ -443,7 +465,8 @@ end;
 
 function Library:GetShimmerSequence(Color)
     -- Static fallback (used before the animation starts or for non-animated
-    -- callers). Just a flat accent bar with no travelling pulse.
+    -- callers). The multiplier keeps the visible color at the target accent
+    -- when it is drawn over the brighter shimmer surface.
     local Colors = Library:GetShimmerColors(Color);
     return ColorSequence.new({
         ColorSequenceKeypoint.new(0, Colors.Base);
@@ -473,8 +496,11 @@ function Library:AddGradient(Instance, Color, Rotation, Animated, Shimmer)
             -- gradient Instance, which rejects unknown members) so the per-frame
             -- loop can rebuild the ColorSequence, and so SetGradientColor can
             -- refresh them when the accent changes.
+            local Colors = Library:GetShimmerColors(Color);
+            Library:ApplyShimmerSurface(Instance, Colors);
+
             Library.ShimmerGradients[Gradient] = {
-                Colors = Library:GetShimmerColors(Color);
+                Colors = Colors;
                 HalfWidth = 0.09;
             };
         end;
@@ -553,6 +579,7 @@ function Library:SetGradientColor(Instance, Color)
             local State = Library.ShimmerGradients[Gradient];
             if State then
                 State.Colors = Library:GetShimmerColors(Color);
+                Library:ApplyShimmerSurface(Gradient.Parent, State.Colors);
             end;
         else
             Gradient.Color = Library:GetGradientSequence(Color);
@@ -638,6 +665,7 @@ function Library:UpdateColorsUsingRegistry()
                 local State = Library.ShimmerGradients[Object.Gradient];
                 if State then
                     State.Colors = Library:GetShimmerColors(GColor);
+                    Library:ApplyShimmerSurface(Object.Instance, State.Colors);
                 end;
             else
                 Object.Gradient.Color = Library:GetGradientSequence(GColor);
