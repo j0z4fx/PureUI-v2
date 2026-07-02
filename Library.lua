@@ -250,6 +250,12 @@ function Library:AddToolTip(InfoStr, HoverInstance)
 end
 
 function Library:OnHighlight(HighlightInstance, Instance, Properties, PropertiesDefault)
+    local HoverStroke;
+
+    if Instance:IsA('Frame') then
+        HoverStroke = Library:AddHoverStroke(Instance);
+    end;
+
     HighlightInstance.MouseEnter:Connect(function()
         local Reg = Library.RegistryMap[Instance];
 
@@ -259,6 +265,10 @@ function Library:OnHighlight(HighlightInstance, Instance, Properties, Properties
             if Reg and Reg.Properties[Property] then
                 Reg.Properties[Property] = ColorIdx;
             end;
+        end;
+
+        if HoverStroke then
+            Library:Tween(HoverStroke, 0.14, { Transparency = 0 });
         end;
     end)
 
@@ -271,6 +281,10 @@ function Library:OnHighlight(HighlightInstance, Instance, Properties, Properties
             if Reg and Reg.Properties[Property] then
                 Reg.Properties[Property] = ColorIdx;
             end;
+        end;
+
+        if HoverStroke then
+            Library:Tween(HoverStroke, 0.16, { Transparency = 1 });
         end;
     end)
 end;
@@ -341,7 +355,7 @@ function Library:GetGradientSequence(Color)
     });
 end;
 
-function Library:AddGradient(Instance, Color, Rotation)
+function Library:AddGradient(Instance, Color, Rotation, Animated)
     local Gradient = Library:Create('UIGradient', {
         Name = 'PureGradient';
         Color = Library:GetGradientSequence(Color);
@@ -356,7 +370,50 @@ function Library:AddGradient(Instance, Color, Rotation)
         Reg.GradientRotation = Rotation or 90;
     end;
 
+    if Animated then
+        Library:AnimateGradient(Gradient, Rotation);
+    end;
+
     return Gradient;
+end;
+
+function Library:AnimateGradient(Gradient, Rotation)
+    local StartedAt = os.clock();
+    local Connection;
+
+    Connection = RenderStepped:Connect(function()
+        if not Gradient.Parent then
+            Connection:Disconnect();
+            return;
+        end;
+
+        local Offset = ((os.clock() - StartedAt) * 0.35) % 2 - 1;
+        if (Rotation or Gradient.Rotation) == 0 then
+            Gradient.Offset = Vector2.new(Offset, 0);
+        else
+            Gradient.Offset = Vector2.new(0, Offset);
+        end;
+    end);
+
+    Library:GiveSignal(Connection);
+end;
+
+function Library:AddHoverStroke(Instance)
+    local Stroke = Library:Create('UIStroke', {
+        Color = Library.AccentColor;
+        Thickness = 1;
+        Transparency = 1;
+        LineJoinMode = Enum.LineJoinMode.Miter;
+        Parent = Instance;
+    });
+
+    Library:AddToRegistry(Stroke, {
+        Color = 'AccentColor';
+    });
+
+    local Gradient = Library:AddGradient(Stroke, 'AccentColor', 0, true);
+
+    return Stroke, Gradient;
 end;
 
 function Library:SetGradientColor(Instance, Color)
@@ -861,7 +918,7 @@ do
 
         Library:AddToRegistry(PickerFrameInner, { BackgroundColor3 = 'BackgroundColor'; BorderColor3 = 'OutlineColor'; });
         Library:AddToRegistry(Highlight, { BackgroundColor3 = 'AccentColor'; });
-        Library:AddGradient(Highlight, 'AccentColor', 0);
+        Library:AddGradient(Highlight, 'AccentColor', 0, true);
         Library:AddToRegistry(SatVibMapInner, { BackgroundColor3 = 'BackgroundColor'; BorderColor3 = 'OutlineColor'; });
 
         Library:AddToRegistry(HueBoxInner, { BackgroundColor3 = 'ControlColor'; BorderColor3 = 'OutlineColor'; });
@@ -2323,13 +2380,35 @@ do
             Parent = DropdownInner;
         });
 
-        local DropdownPlus = Library:CreateLabel({
+        local DropdownPlus = Library:Create('Frame', {
+            BackgroundTransparency = 1;
             Size = UDim2.new(1, 0, 1, 0);
-            Text = '+';
-            TextSize = 16;
             ZIndex = 9;
             Parent = DropdownIconFrame;
         });
+
+        local DropdownPlusH = Library:Create('Frame', {
+            AnchorPoint = Vector2.new(0.5, 0.5);
+            BackgroundColor3 = Library.FontColor;
+            BorderSizePixel = 0;
+            Position = UDim2.fromScale(0.5, 0.5);
+            Size = UDim2.new(0, 8, 0, 1);
+            ZIndex = 10;
+            Parent = DropdownPlus;
+        });
+
+        local DropdownPlusV = Library:Create('Frame', {
+            AnchorPoint = Vector2.new(0.5, 0.5);
+            BackgroundColor3 = Library.FontColor;
+            BorderSizePixel = 0;
+            Position = UDim2.fromScale(0.5, 0.5);
+            Size = UDim2.new(0, 1, 0, 8);
+            ZIndex = 10;
+            Parent = DropdownPlus;
+        });
+
+        Library:AddToRegistry(DropdownPlusH, { BackgroundColor3 = 'FontColor' });
+        Library:AddToRegistry(DropdownPlusV, { BackgroundColor3 = 'FontColor' });
 
         local DropdownMinus = Library:CreateLabel({
             Size = UDim2.new(1, 0, 1, 0);
@@ -2591,7 +2670,8 @@ do
             ListInner.BackgroundTransparency = 1;
             Library.OpenedFrames[ListOuter] = true;
             Library:Tween(ListInner, 0.12, { BackgroundTransparency = 0 });
-            Library:Tween(DropdownPlus, 0.1, { TextTransparency = 1 });
+            Library:Tween(DropdownPlusH, 0.1, { BackgroundTransparency = 1 });
+            Library:Tween(DropdownPlusV, 0.1, { BackgroundTransparency = 1 });
             Library:Tween(DropdownMinus, 0.1, { TextTransparency = 0 });
         end;
 
@@ -2599,7 +2679,8 @@ do
             Dropdown.Open = false;
             Library.OpenedFrames[ListOuter] = nil;
             Library:Tween(ListInner, 0.1, { BackgroundTransparency = 1 });
-            Library:Tween(DropdownPlus, 0.1, { TextTransparency = 0 });
+            Library:Tween(DropdownPlusH, 0.1, { BackgroundTransparency = 0 });
+            Library:Tween(DropdownPlusV, 0.1, { BackgroundTransparency = 0 });
             Library:Tween(DropdownMinus, 0.1, { TextTransparency = 1 });
 
             task.delay(0.1, function()
@@ -2896,7 +2977,7 @@ do
     Library:AddToRegistry(ColorFrame, {
         BackgroundColor3 = 'AccentColor';
     }, true);
-    Library:AddGradient(ColorFrame, 'AccentColor', 0);
+    Library:AddGradient(ColorFrame, 'AccentColor', 0, true);
 
     local KeybindLabel = Library:CreateLabel({
         Size = UDim2.new(1, 0, 0, 20);
@@ -3009,7 +3090,7 @@ function Library:Notify(Text, Time)
     Library:AddToRegistry(LeftColor, {
         BackgroundColor3 = 'AccentColor';
     }, true);
-    Library:AddGradient(LeftColor, 'AccentColor', 0);
+    Library:AddGradient(LeftColor, 'AccentColor', 0, true);
 
     pcall(NotifyOuter.TweenSize, NotifyOuter, UDim2.new(0, XSize + 8 + 4, 0, YSize), 'Out', 'Quad', 0.4, true);
 
@@ -3335,7 +3416,7 @@ function Library:CreateWindow(...)
             Library:AddToRegistry(Highlight, {
                 BackgroundColor3 = 'AccentColor';
             });
-            Library:AddGradient(Highlight, 'AccentColor', 0);
+            Library:AddGradient(Highlight, 'AccentColor', 0, true);
 
             local GroupboxLabel = Library:CreateLabel({
                 Size = UDim2.new(1, 0, 0, 18);
@@ -3436,7 +3517,7 @@ function Library:CreateWindow(...)
             Library:AddToRegistry(Highlight, {
                 BackgroundColor3 = 'AccentColor';
             });
-            Library:AddGradient(Highlight, 'AccentColor', 0);
+            Library:AddGradient(Highlight, 'AccentColor', 0, true);
 
             local TabboxButtons = Library:Create('Frame', {
                 BackgroundTransparency = 1;
