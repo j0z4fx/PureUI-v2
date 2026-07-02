@@ -3646,6 +3646,463 @@ function Library:CreateTargetInfo(Info)
     return TargetInfo;
 end;
 
+function Library:CreatePlayerList(Info)
+    Info = Info or {};
+
+    local PlayerList = {
+        Rows = {};
+        Actions = {};
+        SelectedPlayer = nil;
+    };
+
+    local ListOuter = Library:Create('Frame', {
+        AnchorPoint = Info.AnchorPoint or Vector2.new(1, 0.5);
+        BorderColor3 = Color3.new(0, 0, 0);
+        Position = Info.Position or UDim2.new(1, -24, 0.5, 0);
+        Size = Info.Size or UDim2.fromOffset(300, 360);
+        Visible = Info.Visible ~= false;
+        ZIndex = 80;
+        Parent = ScreenGui;
+    });
+
+    local ListInner = Library:Create('Frame', {
+        BackgroundColor3 = Library.MainColor;
+        BorderColor3 = Library.OutlineColor;
+        BorderMode = Enum.BorderMode.Inset;
+        Size = UDim2.new(1, 0, 1, 0);
+        ZIndex = 81;
+        Parent = ListOuter;
+    });
+
+    Library:AddToRegistry(ListInner, {
+        BackgroundColor3 = 'MainColor';
+        BorderColor3 = 'OutlineColor';
+    }, true);
+    Library:AddGradient(ListInner, 'MainColor');
+
+    local AccentBar = Library:Create('Frame', {
+        BackgroundColor3 = Library.AccentColor;
+        BorderSizePixel = 0;
+        Size = UDim2.new(1, 0, 0, 2);
+        ZIndex = 84;
+        Parent = ListInner;
+    });
+
+    Library:AddToRegistry(AccentBar, {
+        BackgroundColor3 = 'AccentColor';
+    }, true);
+    Library:AddGradient(AccentBar, 'AccentColor', 0, true, true);
+
+    local TitleLabel = Library:CreateLabel({
+        Position = UDim2.new(0, 8, 0, 4);
+        Size = UDim2.new(1, -16, 0, 20);
+        Text = Info.Title or 'Player list';
+        TextSize = 14;
+        TextXAlignment = Enum.TextXAlignment.Left;
+        ZIndex = 84;
+        Parent = ListInner;
+    }, true);
+
+    local PlayersOuter = Library:Create('Frame', {
+        BackgroundColor3 = Library.BackgroundColor;
+        BorderColor3 = Library.OutlineColor;
+        BorderMode = Enum.BorderMode.Inset;
+        Position = UDim2.new(0, 8, 0, 28);
+        Size = UDim2.new(1, -16, 0.66, -34);
+        ZIndex = 82;
+        Parent = ListInner;
+    });
+
+    Library:AddToRegistry(PlayersOuter, {
+        BackgroundColor3 = 'BackgroundColor';
+        BorderColor3 = 'OutlineColor';
+    }, true);
+
+    local PlayersScroll = Library:Create('ScrollingFrame', {
+        BackgroundTransparency = 1;
+        BorderSizePixel = 0;
+        CanvasSize = UDim2.new(0, 0, 0, 0);
+        Position = UDim2.new(0, 2, 0, 2);
+        Size = UDim2.new(1, -4, 1, -4);
+        ScrollBarImageColor3 = Library.AccentColor;
+        ScrollBarThickness = 3;
+        ZIndex = 83;
+        Parent = PlayersOuter;
+    });
+
+    Library:AddToRegistry(PlayersScroll, {
+        ScrollBarImageColor3 = 'AccentColor';
+    }, true);
+
+    local PlayersLayout = Library:Create('UIListLayout', {
+        FillDirection = Enum.FillDirection.Vertical;
+        Padding = UDim.new(0, 2);
+        SortOrder = Enum.SortOrder.LayoutOrder;
+        Parent = PlayersScroll;
+    });
+
+    PlayersLayout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
+        PlayersScroll.CanvasSize = UDim2.fromOffset(0, PlayersLayout.AbsoluteContentSize.Y + 2);
+    end);
+
+    local ActionsOuter = Library:Create('Frame', {
+        BackgroundColor3 = Library.BackgroundColor;
+        BorderColor3 = Library.OutlineColor;
+        BorderMode = Enum.BorderMode.Inset;
+        Position = UDim2.new(0, 8, 0.66, 0);
+        Size = UDim2.new(1, -16, 0.34, -8);
+        ZIndex = 82;
+        Parent = ListInner;
+    });
+
+    Library:AddToRegistry(ActionsOuter, {
+        BackgroundColor3 = 'BackgroundColor';
+        BorderColor3 = 'OutlineColor';
+    }, true);
+
+    local ActionsContainer = Library:Create('Frame', {
+        BackgroundTransparency = 1;
+        Position = UDim2.new(0, 4, 0, 22);
+        Size = UDim2.new(1, -8, 1, -26);
+        ZIndex = 83;
+        Parent = ActionsOuter;
+    });
+
+    Library:CreateLabel({
+        Position = UDim2.new(0, 4, 0, 2);
+        Size = UDim2.new(1, -8, 0, 18);
+        Text = 'Actions';
+        TextSize = 13;
+        TextXAlignment = Enum.TextXAlignment.Left;
+        ZIndex = 83;
+        Parent = ActionsOuter;
+    }, true);
+
+    Library:Create('UIListLayout', {
+        FillDirection = Enum.FillDirection.Vertical;
+        Padding = UDim.new(0, 4);
+        SortOrder = Enum.SortOrder.LayoutOrder;
+        Parent = ActionsContainer;
+    });
+
+    function PlayerList:GetSelectedPlayer()
+        return self.SelectedPlayer;
+    end;
+
+    function PlayerList:SetVisible(Visible)
+        ListOuter.Visible = Visible;
+    end;
+
+    function PlayerList:Destroy()
+        for _, Action in next, self.Actions do
+            if typeof(Action) == 'RBXScriptConnection' then
+                pcall(function()
+                    Action:Disconnect();
+                end);
+            end;
+        end;
+
+        ListOuter:Destroy();
+    end;
+
+    function PlayerList:SetSelectedPlayer(Player)
+        self.SelectedPlayer = Player;
+
+        for RowPlayer, Row in next, self.Rows do
+            local Selected = RowPlayer == Player;
+            Row.Inner.BackgroundColor3 = Selected and Library.ControlColor or Library.BackgroundColor;
+            Library:SetGradientColor(Row.Inner, Selected and 'ControlColor' or 'BackgroundColor');
+            Row.NameLabel.TextColor3 = Selected and Library.AccentColor or Library.FontColor;
+
+            if Library.RegistryMap[Row.Inner] then
+                Library.RegistryMap[Row.Inner].Properties.BackgroundColor3 = Selected and 'ControlColor' or 'BackgroundColor';
+            end;
+
+            if Library.RegistryMap[Row.NameLabel] then
+                Library.RegistryMap[Row.NameLabel].Properties.TextColor3 = Selected and 'AccentColor' or 'FontColor';
+            end;
+        end;
+    end;
+
+    function PlayerList:ClearRows()
+        for _, Row in next, self.Rows do
+            Row.Outer:Destroy();
+        end;
+
+        self.Rows = {};
+    end;
+
+    function PlayerList:AddPlayerRow(Player)
+        local RowOuter = Library:Create('Frame', {
+            Active = true;
+            BackgroundColor3 = Color3.new(0, 0, 0);
+            BorderColor3 = Color3.new(0, 0, 0);
+            Size = UDim2.new(1, -2, 0, 34);
+            ZIndex = 84;
+            Parent = PlayersScroll;
+        });
+
+        Library:AddToRegistry(RowOuter, {
+            BorderColor3 = 'Black';
+        }, true);
+
+        local RowInner = Library:Create('Frame', {
+            BackgroundColor3 = Library.BackgroundColor;
+            BorderColor3 = Library.OutlineColor;
+            BorderMode = Enum.BorderMode.Inset;
+            Size = UDim2.new(1, 0, 1, 0);
+            ZIndex = 85;
+            Parent = RowOuter;
+        });
+
+        Library:AddToRegistry(RowInner, {
+            BackgroundColor3 = 'BackgroundColor';
+            BorderColor3 = 'OutlineColor';
+        }, true);
+        Library:AddGradient(RowInner, 'BackgroundColor');
+
+        local Avatar = Library:Create('ImageLabel', {
+            BackgroundColor3 = Library.ControlColor;
+            BorderSizePixel = 0;
+            Position = UDim2.new(0, 4, 0, 4);
+            Size = UDim2.new(0, 26, 0, 26);
+            ZIndex = 86;
+            Parent = RowInner;
+        });
+
+        Library:AddToRegistry(Avatar, {
+            BackgroundColor3 = 'ControlColor';
+        }, true);
+
+        task.spawn(function()
+            local Ok, Content = pcall(Players.GetUserThumbnailAsync, Players, Player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100);
+            if Ok and Avatar.Parent then
+                Avatar.Image = Content;
+            end;
+        end);
+
+        local NameLabel = Library:CreateLabel({
+            Position = UDim2.new(0, 36, 0, 0);
+            Size = UDim2.new(1, -42, 1, 0);
+            Text = string.format('%s [%s]', Player.DisplayName, Player.Name);
+            TextSize = 13;
+            TextXAlignment = Enum.TextXAlignment.Left;
+            ZIndex = 86;
+            Parent = RowInner;
+        }, true);
+
+        RowOuter.InputBegan:Connect(function(Input)
+            if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+                self:SetSelectedPlayer(Player);
+            end;
+        end);
+
+        self.Rows[Player] = {
+            Outer = RowOuter;
+            Inner = RowInner;
+            NameLabel = NameLabel;
+        };
+    end;
+
+    function PlayerList:Refresh()
+        local Current = self.SelectedPlayer;
+        self:ClearRows();
+
+        local CurrentPlayers = Players:GetPlayers();
+        table.sort(CurrentPlayers, function(A, B)
+            return A.Name:lower() < B.Name:lower();
+        end);
+
+        for _, Player in next, CurrentPlayers do
+            self:AddPlayerRow(Player);
+        end;
+
+        if Current and Players:FindFirstChild(Current.Name) then
+            self:SetSelectedPlayer(Current);
+        else
+            self:SetSelectedPlayer(CurrentPlayers[1]);
+        end;
+    end;
+
+    local function ProcessActionParams(Obj, ...)
+        local Props = select(1, ...);
+        if type(Props) == 'table' then
+            Obj.Text = Props.Text;
+            Obj.Func = Props.Func or Props.Callback;
+            Obj.Tooltip = Props.Tooltip;
+        else
+            Obj.Text = select(1, ...);
+            Obj.Func = select(2, ...);
+        end;
+
+        assert(type(Obj.Func) == 'function', 'PlayerList:AddButton: callback is missing.');
+    end;
+
+    function PlayerList:AddButton(...)
+        local Button = {};
+        ProcessActionParams(Button, ...);
+
+        local ButtonOuter = Library:Create('Frame', {
+            Active = true;
+            BackgroundColor3 = Color3.new(0, 0, 0);
+            BorderColor3 = Color3.new(0, 0, 0);
+            Size = UDim2.new(1, 0, 0, 22);
+            ZIndex = 84;
+            Parent = ActionsContainer;
+        });
+
+        Library:AddToRegistry(ButtonOuter, {
+            BorderColor3 = 'Black';
+        }, true);
+
+        local ButtonInner = Library:Create('Frame', {
+            BackgroundColor3 = Library.ControlColor;
+            BorderColor3 = Library.OutlineColor;
+            BorderMode = Enum.BorderMode.Inset;
+            Size = UDim2.new(1, 0, 1, 0);
+            ZIndex = 85;
+            Parent = ButtonOuter;
+        });
+
+        Library:AddToRegistry(ButtonInner, {
+            BackgroundColor3 = 'ControlColor';
+            BorderColor3 = 'OutlineColor';
+        }, true);
+        Library:AddGradient(ButtonInner, 'ControlColor');
+
+        Library:CreateLabel({
+            Size = UDim2.new(1, 0, 1, 0);
+            Text = Button.Text;
+            TextSize = 13;
+            ZIndex = 86;
+            Parent = ButtonInner;
+        }, true);
+
+        ButtonOuter.MouseEnter:Connect(function()
+            Library:Tween(ButtonInner, 0.1, { BackgroundColor3 = Library:GetLighterColor(Library.ControlColor) });
+        end);
+
+        ButtonOuter.MouseLeave:Connect(function()
+            Library:Tween(ButtonInner, 0.12, { BackgroundColor3 = Library.ControlColor });
+        end);
+
+        ButtonOuter.InputBegan:Connect(function(Input)
+            if Input.UserInputType == Enum.UserInputType.MouseButton1 and not Library:MouseIsOverOpenedFrame() then
+                Library:SafeCallback(Button.Func, self.SelectedPlayer, self);
+            end;
+        end);
+
+        if type(Button.Tooltip) == 'string' then
+            Library:AddToolTip(Button.Tooltip, ButtonOuter);
+        end;
+
+        return Button;
+    end;
+
+    function PlayerList:AddToggle(Idx, Info)
+        Info = Info or {};
+
+        local Toggle = {
+            Value = Info.Default == true;
+            Callback = Info.Callback or function() end;
+        };
+
+        local ToggleOuter = Library:Create('Frame', {
+            Active = true;
+            BackgroundTransparency = 1;
+            Size = UDim2.new(1, 0, 0, 20);
+            ZIndex = 84;
+            Parent = ActionsContainer;
+        });
+
+        local ToggleBox = Library:Create('Frame', {
+            BackgroundColor3 = Library.ControlColor;
+            BorderColor3 = Library.OutlineColor;
+            BorderMode = Enum.BorderMode.Inset;
+            Position = UDim2.new(0, 0, 0, 3);
+            Size = UDim2.new(0, 14, 0, 14);
+            ZIndex = 85;
+            Parent = ToggleOuter;
+        });
+
+        Library:AddToRegistry(ToggleBox, {
+            BackgroundColor3 = 'ControlColor';
+            BorderColor3 = 'OutlineColor';
+        }, true);
+        Library:AddGradient(ToggleBox, 'ControlColor');
+
+        local ToggleFill = Library:Create('Frame', {
+            BackgroundColor3 = Library.AccentColor;
+            BorderSizePixel = 0;
+            Position = UDim2.new(0, 3, 0, 3);
+            Size = UDim2.new(1, -6, 1, -6);
+            ZIndex = 86;
+            Parent = ToggleBox;
+        });
+
+        Library:AddToRegistry(ToggleFill, {
+            BackgroundColor3 = 'AccentColor';
+        }, true);
+
+        Library:CreateLabel({
+            Position = UDim2.new(0, 21, 0, 0);
+            Size = UDim2.new(1, -21, 1, 0);
+            Text = Info.Text or Idx;
+            TextSize = 13;
+            TextXAlignment = Enum.TextXAlignment.Left;
+            ZIndex = 85;
+            Parent = ToggleOuter;
+        }, true);
+
+        function Toggle:SetValue(Value)
+            self.Value = Value == true;
+            ToggleFill.Visible = self.Value;
+            Library:SafeCallback(self.Callback, self.Value, PlayerList.SelectedPlayer, PlayerList);
+        end;
+
+        function Toggle:OnChanged(Callback)
+            self.Callback = Callback;
+            Callback(self.Value, PlayerList.SelectedPlayer, PlayerList);
+        end;
+
+        ToggleOuter.InputBegan:Connect(function(Input)
+            if Input.UserInputType == Enum.UserInputType.MouseButton1 and not Library:MouseIsOverOpenedFrame() then
+                Toggle:SetValue(not Toggle.Value);
+            end;
+        end);
+
+        Toggle:SetValue(Toggle.Value);
+        self.Actions[Idx] = Toggle;
+        return Toggle;
+    end;
+
+    Library:MakeDraggable(ListOuter, 24);
+    PlayerList.Holder = ListOuter;
+    PlayerList.Container = ActionsContainer;
+
+    PlayerList:Refresh();
+
+    local PlayerAddedConnection = Players.PlayerAdded:Connect(function()
+        PlayerList:Refresh();
+    end);
+
+    table.insert(PlayerList.Actions, PlayerAddedConnection);
+    Library:GiveSignal(PlayerAddedConnection);
+
+    local PlayerRemovingConnection = Players.PlayerRemoving:Connect(function(Player)
+        if PlayerList.SelectedPlayer == Player then
+            PlayerList.SelectedPlayer = nil;
+        end;
+
+        PlayerList:Refresh();
+    end);
+
+    table.insert(PlayerList.Actions, PlayerRemovingConnection);
+    Library:GiveSignal(PlayerRemovingConnection);
+
+    return PlayerList;
+end;
+
 function Library:CreateWindow(...)
     local Arguments = { ... }
     local Config = { AnchorPoint = Vector2.zero }

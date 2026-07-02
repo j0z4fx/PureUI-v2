@@ -14,6 +14,47 @@ Used in the Linoria script hub: https://kyaru.cloud
 - Almost any UI element you would ever need (toggles, sliders, dropdowns, etc)
 - Interface automatically becomes scrollable whenever there are too many UI elements
 - Dependency boxes, allowing you to easily hide/show UI elements depending on the state of other UI elements
+- Separate target info and player list windows for player-focused scripts
+
+## Extra Windows
+
+### Target Info
+
+```lua
+local TargetInfo = Library:CreateTargetInfo({
+    Player = game:GetService('Players').LocalPlayer,
+    shieldBar = true, -- set false to hide the armor bar
+})
+
+TargetInfo:SetPlayer(game:GetService('Players').LocalPlayer)
+TargetInfo:SetHealth(75, 100)
+TargetInfo:SetArmor(50)
+```
+
+### Player List
+
+```lua
+local PlayerList = Library:CreatePlayerList({
+    Title = 'Players',
+})
+
+PlayerList:AddButton({
+    Text = 'Teleport',
+    Func = function(Player)
+        print('Teleport action for', Player and Player.Name)
+    end,
+})
+
+PlayerList:AddToggle('SpectatePlayer', {
+    Text = 'Spectate',
+    Default = false,
+    Callback = function(Value, Player)
+        print('Spectate:', Value, Player and Player.Name)
+    end,
+})
+```
+
+The player list window is separate from the main menu. The top section shows players with profile pictures, and the bottom third is reserved for compact action controls. Action callbacks receive the selected player.
 
 ## Interface Preview
 <img src="https://i.imgur.com/qs0Hqc6.png" />
