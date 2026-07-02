@@ -1,7 +1,7 @@
 -- New example script written by wally
 -- You can suggest changes with a pull request or something
 
-local repo = 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/a624601/'
+local repo = 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/8943954/'
 local cacheBust = '?v=' .. tostring(os.time())
 
 local Library = loadstring(game:HttpGet(repo .. 'Library.lua' .. cacheBust))()
@@ -80,6 +80,14 @@ PlayerList:AddToggle('SpectatePlayer', {
                 Camera.CameraSubject = Humanoid
             end
         end
+    end,
+})
+
+PlayerList:AddDropdown('Disposition', {
+    Values = { 'Whitelist', 'Enemy', 'Sentry', 'Sentry (Passive)' },
+    Default = 'Whitelist',
+    Callback = function(Value, Player)
+        Library:Notify((Player and Player.Name or 'No player') .. ': ' .. tostring(Value), 2)
     end,
 })
 
