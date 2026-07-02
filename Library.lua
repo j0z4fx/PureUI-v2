@@ -1160,10 +1160,13 @@ function Library:LoadInfiniteYield(Info)
 
     local Env = getgenv();
     local HasRunner = type(Env.execCmd) == 'function' and type(Env.cmds) == 'table';
-
-    if HasRunner then
+    local function RestorePureGlobals()
         Env.Toggles = Toggles;
         Env.Options = Options;
+    end;
+
+    if HasRunner then
+        RestorePureGlobals();
     end;
 
     if Library.InfiniteYield and HasRunner and not Info.Reload then
@@ -1213,8 +1216,10 @@ function Library:LoadInfiniteYield(Info)
             Library:Notify('Infinite Yield failed to load: ' .. tostring(Result), 6);
         end;
 
-        getgenv().Toggles = Toggles;
-        getgenv().Options = Options;
+        RestorePureGlobals();
+        task.defer(RestorePureGlobals);
+        task.delay(0.25, RestorePureGlobals);
+        task.delay(1, RestorePureGlobals);
     end;
 
     task.defer(function()
