@@ -359,17 +359,20 @@ function Library:GetGradientSequence(Color)
     });
 end;
 
--- Shimmer sequence used by animated accent lines. A single bright pulse sits in
--- a field of the accent color, and the accent color is repeated at both ends.
--- Because both endpoints are identical, sweeping Offset from 0 to 1 (one full
--- tile) wraps with no visible seam -- the pulse travels across, exits one side
--- and re-enters the other continuously. Tinted toward the accent color so the
--- bar reads as accent rather than grayscale (which is what caused the flicker).
+-- Shimmer sequence used by animated accent lines. Two identical bright pulses
+-- sit at 0.25 and 0.75 -- symmetric and exactly half a tile apart. As Offset
+-- sweeps 0 -> -0.5 the whole pattern shifts by half a tile: each pulse lands
+-- where the other one was, so the line looks identical at both ends of the
+-- sweep and the wrap is invisible. Because the pulses are spaced across the
+-- whole gradient (not bunched in the middle), the full width of the line is
+-- always near a pulse -- no dead zones, no "only half animated". While one
+-- pulse exits a side the other enters from the opposite side, so motion reads
+-- as continuous travel rather than a pulse popping back to center.
 function Library:GetShimmerSequence(Color)
     local Base = (typeof(Color) == 'Color3' and Color) or Library.AccentColor;
 
-    -- Brighten the accent for the travelling highlight. Clamp via fromRGB so we
-    -- never overflow past white.
+    -- Brighten the accent for the travelling highlights. Clamp via fromRGB so
+    -- we never overflow past white.
     local function Brighter(C, Amount)
         return Color3.fromRGB(
             math.min(255, math.floor(C.R * 255 + Amount)),
@@ -378,15 +381,23 @@ function Library:GetShimmerSequence(Color)
         );
     end;
 
-    local Hi = Brighter(Base, 90);
-    local Mid = Brighter(Base, 35);
+    local Hi = Brighter(Base, 80);
+    local Mid = Brighter(Base, 30);
+
+    -- Half-width of each pulse. Two pulses at 0.25 and 0.75 with this width
+    -- tile the 0..1 range so every point on the line passes through a pulse
+    -- during a half-tile sweep.
+    local P = 0.085;
 
     return ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Base),
-        ColorSequenceKeypoint.new(0.35, Base),
-        ColorSequenceKeypoint.new(0.5, Hi),
-        ColorSequenceKeypoint.new(0.65, Base),
-        ColorSequenceKeypoint.new(1, Base),
+        ColorSequenceKeypoint.new(0,            Mid),
+        ColorSequenceKeypoint.new(0.25 - P,     Base),
+        ColorSequenceKeypoint.new(0.25,         Hi),
+        ColorSequenceKeypoint.new(0.25 + P,     Base),
+        ColorSequenceKeypoint.new(0.75 - P,     Base),
+        ColorSequenceKeypoint.new(0.75,         Hi),
+        ColorSequenceKeypoint.new(0.75 + P,     Base),
+        ColorSequenceKeypoint.new(1,            Mid),
     });
 end;
 
@@ -414,12 +425,14 @@ function Library:AddGradient(Instance, Color, Rotation, Animated, Shimmer)
 end;
 
 function Library:AnimateGradient(Gradient, Rotation)
-    -- The shimmer sequence has identical accent color at both ends (offset 0 and
-    -- 1 look the same), so sweeping Offset across exactly one tile wraps with no
-    -- visible seam. The bright pulse travels along the line continuously instead
-    -- of the old gray-band sweep that flickered on thin bars.
+    -- The shimmer sequence holds two pulses half a tile apart, so the pattern
+    -- repeats every HALF tile. Sweep Offset across exactly that range (0 to
+    -- -0.5): at both ends the line looks identical (each pulse sits where the
+    -- other was), so the wrap is invisible. One cycle = half a tile = one
+    -- pulse-width of travel; double the per-second rate so perceived speed
+    -- stays the same.
     local StartedAt = os.clock();
-    local Speed = 0.25; -- tiles per second (lower = lazier shimmer)
+    local Speed = 0.5; -- half-tiles per second
     local Connection;
 
     Connection = RenderStepped:Connect(function()
@@ -428,7 +441,7 @@ function Library:AnimateGradient(Gradient, Rotation)
             return;
         end;
 
-        local Offset = -(((os.clock() - StartedAt) * Speed) % 1);
+        local Offset = -0.5 * (((os.clock() - StartedAt) * Speed) % 1);
         if (Rotation or Gradient.Rotation) == 0 then
             Gradient.Offset = Vector2.new(Offset, 0);
         else
