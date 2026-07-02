@@ -692,14 +692,17 @@ function Library:CreateCommandModal(Info)
                 table.insert(self.Items, {
                     Text = Item;
                     Value = Item;
+                    AutoComplete = Item;
                 });
             elseif type(Item) == 'table' then
                 table.insert(self.Items, {
                     Text = Item.Text or Item.Name or tostring(Item.Value);
                     Value = Item.Value or Item.Text or Item.Name;
+                    AutoComplete = Item.AutoComplete or Item.Command or Item.Value or Item.Text or Item.Name;
                     Callback = Item.Callback or Item.Func;
                     Search = Item.Search;
                     Description = Item.Description or Item.Desc;
+                    RankData = Item.RankData;
                 });
             end;
         end;
@@ -733,6 +736,7 @@ function Library:CreateCommandModal(Info)
 
         for _, Item in next, self.Items do
             local Matches;
+            local Rank;
             if type(Info.Filter) == 'function' then
                 Matches = Info.Filter(Item, self:GetQuery());
             else
@@ -740,9 +744,24 @@ function Library:CreateCommandModal(Info)
             end;
 
             if Matches then
+                if type(Info.Rank) == 'function' then
+                    Rank = Info.Rank(Item, self:GetQuery());
+                else
+                    Rank = Item.Text:lower():find(Query, 1, true) or 9999;
+                end;
+
+                Item.__PureRank = Rank or 9999;
                 table.insert(self.Filtered, Item);
             end;
         end;
+
+        table.sort(self.Filtered, function(A, B)
+            if A.__PureRank == B.__PureRank then
+                return tostring(A.Text):lower() < tostring(B.Text):lower();
+            end;
+
+            return A.__PureRank < B.__PureRank;
+        end);
 
         if self.SelectedIndex > #self.Filtered then
             self.SelectedIndex = 1;
@@ -785,11 +804,16 @@ function Library:CreateCommandModal(Info)
     function CommandModal:RefreshGhost()
         local Query = self:GetQuery();
         local Top = self.Filtered[1];
+        local Completion = Top and tostring(Top.AutoComplete or Top.Value or Top.Text or '');
 
-        if Query ~= '' and Top and Top.Text:lower():sub(1, #Query) == Query:lower() and #Top.Text > #Query then
+        if type(Info.GetAutocompleteText) == 'function' and Top then
+            Completion = Info.GetAutocompleteText(Top, Query);
+        end;
+
+        if Query ~= '' and Completion and Completion:lower():sub(1, #Query) == Query:lower() and #Completion > #Query then
             local X = Library:GetTextBounds(Query, Library.Font, 14);
             GhostLabel.Position = UDim2.new(0, 8 + X, 0, 0);
-            GhostLabel.Text = Top.Text:sub(#Query + 1);
+            GhostLabel.Text = Completion:sub(#Query + 1);
         else
             GhostLabel.Text = '';
         end;
@@ -798,7 +822,12 @@ function Library:CreateCommandModal(Info)
     function CommandModal:Autocomplete()
         local Top = self.Filtered[1];
         if Top then
-            InputBox.Text = Top.Text;
+            local Completion = tostring(Top.AutoComplete or Top.Value or Top.Text or '');
+            if type(Info.GetAutocompleteText) == 'function' then
+                Completion = Info.GetAutocompleteText(Top, self:GetQuery()) or Completion;
+            end;
+
+            InputBox.Text = Completion;
             InputBox.CursorPosition = #InputBox.Text + 1;
             self.SelectedIndex = 1;
             self.ScrollIndex = 1;
@@ -808,6 +837,15 @@ function Library:CreateCommandModal(Info)
 
     function CommandModal:Accept()
         local Query = self:GetQuery();
+        if type(Info.ResolveQuery) == 'function' then
+            local Resolved = Info.ResolveQuery(Query, self.Filtered[self.SelectedIndex], self.Filtered);
+            if Resolved then
+                Library:SafeCallback(self.Callback, Resolved, self.Filtered[self.SelectedIndex], Query);
+                self:SetVisible(false);
+                return;
+            end;
+        end;
+
         local Item = self.Filtered[self.SelectedIndex];
         if not Item then
             if Info.AllowRawAccept and Query:gsub('%s+', '') ~= '' then
@@ -876,6 +914,15 @@ function Library:CreateCommandModal(Info)
         if Input.UserInputType == Enum.UserInputType.Keyboard and Input.KeyCode == Enum.KeyCode.K and CtrlDown then
             CommandModal:Toggle();
             return;
+        end;
+
+        if Input.UserInputType == Enum.UserInputType.Keyboard and type(Info.ToggleKeys) == 'table' then
+            for _, KeyCode in next, Info.ToggleKeys do
+                if Input.KeyCode == KeyCode and not Processed then
+                    CommandModal:Toggle();
+                    return;
+                end;
+            end;
         end;
 
         if not ModalOuter.Visible then
@@ -1003,28 +1050,44 @@ function Library:GetInfiniteYieldCommands()
     local Seen = {};
     local Env = getgenv();
 
-    local function AddItem(Text, Value, Search, Description)
+    local function AddItem(Text, Value, Search, Description, RankData)
         Text = tostring(Text or '');
         Value = tostring(Value or Text);
 
-        if Text == '' or Seen[Text] then
+        if Text == '' then
             return;
         end;
 
-        Seen[Text] = true;
-        table.insert(Items, {
+        if Seen[Text] then
+            if RankData then
+                Seen[Text].RankData = RankData;
+                Seen[Text].Search = table.concat({ tostring(Seen[Text].Search or ''), tostring(Search or '') }, ' '):lower();
+            end;
+
+            return;
+        end;
+
+        local Item = {
             Text = Text;
             Value = Value;
+            AutoComplete = Value;
             Search = (Search or Text):lower();
             Description = Description;
-        });
+            RankData = RankData;
+        };
+
+        Seen[Text] = Item;
+        table.insert(Items, Item);
     end;
 
     if type(Env.CMDs) == 'table' then
         for _, Command in next, Env.CMDs do
             local Text = tostring(Command.NAME or '');
             local Value = Text:match('^%s*([^%s/]+)') or Text;
-            AddItem(Text, Value, table.concat({ Text, tostring(Command.DESC or '') }, ' '), Command.DESC);
+            AddItem(Text, Value, table.concat({ Text, tostring(Command.DESC or '') }, ' '), Command.DESC, {
+                Name = Value:lower();
+                Aliases = {};
+            });
         end;
     end;
 
@@ -1032,7 +1095,10 @@ function Library:GetInfiniteYieldCommands()
         for _, Command in next, Env.cmds do
             local Name = tostring(Command.NAME or '');
             local Aliases = type(Command.ALIAS) == 'table' and table.concat(Command.ALIAS, ' ') or '';
-            AddItem(Name, Name, Name .. ' ' .. Aliases, nil);
+            AddItem(Name, Name, Name .. ' ' .. Aliases, nil, {
+                Name = Name:lower();
+                Aliases = Command.ALIAS or {};
+            });
         end;
     end;
 
@@ -1157,6 +1223,30 @@ function Library:CreateInfiniteYieldCommandModal(Info)
 
     local Wrapper = Library:LoadInfiniteYield(Info);
     local Modal;
+    local function IsKnownCommandHead(Head)
+        Head = tostring(Head or ''):lower();
+
+        if Head == '' then
+            return false;
+        end;
+
+        for _, Command in next, Wrapper:GetCommandItems() do
+            local RankData = Command.RankData or {};
+            local Name = tostring(RankData.Name or Command.Value or Command.Text or ''):lower();
+
+            if Name == Head then
+                return true;
+            end;
+
+            for _, Alias in next, RankData.Aliases or {} do
+                if tostring(Alias):lower() == Head then
+                    return true;
+                end;
+            end;
+        end;
+
+        return false;
+    end;
 
     Modal = Library:CreateCommandModal({
         Title = Info.Title or 'Infinite Yield';
@@ -1166,6 +1256,7 @@ function Library:CreateInfiniteYieldCommandModal(Info)
         MaxRows = Info.MaxRows or 7;
         Items = Wrapper:GetCommandItems();
         AllowRawAccept = true;
+        ToggleKeys = { Enum.KeyCode.Semicolon };
         Filter = function(Item, Query)
             Query = tostring(Query or ''):lower():gsub('^%s+', '');
             local CommandHead = Query:match('^(%S*)') or '';
@@ -1177,9 +1268,69 @@ function Library:CreateInfiniteYieldCommandModal(Info)
             local Search = tostring(Item.Search or Item.Text or ''):lower();
             return Search:find(CommandHead, 1, true) ~= nil;
         end;
+        Rank = function(Item, Query)
+            Query = tostring(Query or ''):lower():gsub('^%s+', '');
+            local CommandHead = Query:match('^(%S*)') or '';
+            local RankData = Item.RankData or {};
+            local Name = tostring(RankData.Name or Item.Value or Item.Text or ''):lower();
+
+            if CommandHead == '' then
+                return 0;
+            end;
+
+            if Name == CommandHead then
+                return 0;
+            end;
+
+            for _, Alias in next, RankData.Aliases or {} do
+                Alias = tostring(Alias):lower();
+                if Alias == CommandHead then
+                    return 1;
+                end;
+            end;
+
+            if Name:sub(1, #CommandHead) == CommandHead then
+                return 10 + (#Name - #CommandHead);
+            end;
+
+            for _, Alias in next, RankData.Aliases or {} do
+                Alias = tostring(Alias):lower();
+                if Alias:sub(1, #CommandHead) == CommandHead then
+                    return 30 + (#Alias - #CommandHead);
+                end;
+            end;
+
+            local Search = tostring(Item.Search or Item.Text or ''):lower();
+            return 100 + (Search:find(CommandHead, 1, true) or 9999);
+        end;
+        GetAutocompleteText = function(Item, Query)
+            local Command = tostring(Item.AutoComplete or Item.Value or Item.Text or '');
+            Query = tostring(Query or '');
+
+            if Query:find('%s') then
+                return Query;
+            end;
+
+            return Command .. ' ';
+        end;
+        ResolveQuery = function(Query, Item)
+            Query = tostring(Query or ''):gsub('^%s+', ''):gsub('%s+$', '');
+            local Head = Query:match('^(%S+)');
+
+            if not Head then
+                return nil;
+            end;
+
+            if IsKnownCommandHead(Head) then
+                return Query;
+            end;
+
+            return nil;
+        end;
         Callback = function(Value, Item, Query)
             local Raw = tostring(Query or ''):gsub('^%s+', ''):gsub('%s+$', '');
-            local CommandText = Raw ~= '' and Raw or tostring(Value or '');
+            local Head = Raw:match('^(%S+)');
+            local CommandText = (Head and IsKnownCommandHead(Head)) and Raw or tostring(Value or '');
             Wrapper:Execute(CommandText);
         end;
     });
@@ -4794,6 +4945,8 @@ function Library:CreatePlayerList(Info)
                 Library.RegistryMap[Row.NameLabel].Properties.TextColor3 = Selected and 'AccentColor' or 'FontColor';
             end;
         end;
+
+        SyncActionsToSelectedPlayer();
     end;
 
     function PlayerList:ClearRows()

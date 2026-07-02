@@ -93,6 +93,8 @@ local CommandModal = Library:CreateInfiniteYieldCommandModal({
 
 The wrapper loads the repo-owned `InfiniteYield.lua` fork, hides its default command menu, feeds IY commands into the Pure command modal, and executes selected or typed commands through IY's `execCmd`. IY utility windows and later external tool UIs are restyled with the Pure theme where possible.
 
+The IY modal also opens with `;`, ranks exact command names above fuzzy matches, autocompletes the command head with `Tab`, and preserves typed arguments such as `fly 2`.
+
 ## Interface Preview
 <img src="https://i.imgur.com/qs0Hqc6.png" />
 
