@@ -341,11 +341,11 @@ function Library:GetGradientSequence(Color)
     });
 end;
 
-function Library:AddGradient(Instance, Color)
+function Library:AddGradient(Instance, Color, Rotation)
     local Gradient = Library:Create('UIGradient', {
         Name = 'PureGradient';
         Color = Library:GetGradientSequence(Color);
-        Rotation = 90;
+        Rotation = Rotation or 90;
         Parent = Instance;
     });
 
@@ -353,6 +353,7 @@ function Library:AddGradient(Instance, Color)
     if Reg then
         Reg.Gradient = Gradient;
         Reg.GradientColor = Color;
+        Reg.GradientRotation = Rotation or 90;
     end;
 
     return Gradient;
@@ -849,7 +850,7 @@ do
 
         Library:AddToRegistry(PickerFrameInner, { BackgroundColor3 = 'BackgroundColor'; BorderColor3 = 'OutlineColor'; });
         Library:AddToRegistry(Highlight, { BackgroundColor3 = 'AccentColor'; });
-        Library:AddGradient(Highlight, 'AccentColor');
+        Library:AddGradient(Highlight, 'AccentColor', 0);
         Library:AddToRegistry(SatVibMapInner, { BackgroundColor3 = 'BackgroundColor'; BorderColor3 = 'OutlineColor'; });
 
         Library:AddToRegistry(HueBoxInner, { BackgroundColor3 = 'MainColor'; BorderColor3 = 'OutlineColor'; });
@@ -2830,7 +2831,7 @@ do
     Library:AddToRegistry(ColorFrame, {
         BackgroundColor3 = 'AccentColor';
     }, true);
-    Library:AddGradient(ColorFrame, 'AccentColor');
+    Library:AddGradient(ColorFrame, 'AccentColor', 0);
 
     local KeybindLabel = Library:CreateLabel({
         Size = UDim2.new(1, 0, 0, 20);
@@ -2943,7 +2944,7 @@ function Library:Notify(Text, Time)
     Library:AddToRegistry(LeftColor, {
         BackgroundColor3 = 'AccentColor';
     }, true);
-    Library:AddGradient(LeftColor, 'AccentColor');
+    Library:AddGradient(LeftColor, 'AccentColor', 0);
 
     pcall(NotifyOuter.TweenSize, NotifyOuter, UDim2.new(0, XSize + 8 + 4, 0, YSize), 'Out', 'Quad', 0.4, true);
 
@@ -3253,7 +3254,7 @@ function Library:CreateWindow(...)
             Library:AddToRegistry(Highlight, {
                 BackgroundColor3 = 'AccentColor';
             });
-            Library:AddGradient(Highlight, 'AccentColor');
+            Library:AddGradient(Highlight, 'AccentColor', 0);
 
             local GroupboxLabel = Library:CreateLabel({
                 Size = UDim2.new(1, 0, 0, 18);
@@ -3354,7 +3355,7 @@ function Library:CreateWindow(...)
             Library:AddToRegistry(Highlight, {
                 BackgroundColor3 = 'AccentColor';
             });
-            Library:AddGradient(Highlight, 'AccentColor');
+            Library:AddGradient(Highlight, 'AccentColor', 0);
 
             local TabboxButtons = Library:Create('Frame', {
                 BackgroundTransparency = 1;
