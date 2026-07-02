@@ -11,6 +11,19 @@ local Mouse = LocalPlayer:GetMouse();
 
 local ProtectGui = protectgui or (syn and syn.protect_gui) or (function() end);
 
+local PreviousLibrary = getgenv().Library;
+if type(PreviousLibrary) == 'table' then
+    if type(PreviousLibrary.Unload) == 'function' then
+        pcall(function()
+            PreviousLibrary:Unload();
+        end);
+    elseif typeof(PreviousLibrary.ScreenGui) == 'Instance' then
+        pcall(function()
+            PreviousLibrary.ScreenGui:Destroy();
+        end);
+    end;
+end;
+
 local ScreenGui = Instance.new('ScreenGui');
 ProtectGui(ScreenGui);
 
@@ -1880,18 +1893,32 @@ function Library:GiveSignal(Signal)
 end
 
 function Library:Unload()
+    if Library.Unloaded then
+        return;
+    end;
+
+    Library.Unloaded = true;
+
     -- Unload all of the signals
     for Idx = #Library.Signals, 1, -1 do
         local Connection = table.remove(Library.Signals, Idx)
-        Connection:Disconnect()
+        pcall(function()
+            Connection:Disconnect()
+        end)
     end
 
      -- Call our unload callback, maybe to undo some hooks etc
     if Library.OnUnload then
-        Library.OnUnload()
+        pcall(Library.OnUnload)
     end
 
-    ScreenGui:Destroy()
+    pcall(function()
+        ScreenGui:Destroy()
+    end)
+
+    if getgenv().Library == Library then
+        getgenv().Library = nil;
+    end
 end
 
 function Library:OnUnload(Callback)
