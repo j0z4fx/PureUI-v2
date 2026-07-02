@@ -3390,7 +3390,7 @@ function Library:CreateTargetInfo(Info)
         AnchorPoint = Vector2.new(0.5, 1);
         BorderColor3 = Color3.new(0, 0, 0);
         Position = Info.Position or UDim2.new(0.5, 0, 1, -120);
-        Size = Info.Size or UDim2.new(0, 270, 0, ShowShield and 104 or 86);
+        Size = Info.Size or UDim2.new(0, 270, 0, ShowShield and 88 or 82);
         Visible = Info.Visible ~= false;
         ZIndex = 90;
         Parent = ScreenGui;
@@ -3428,7 +3428,7 @@ function Library:CreateTargetInfo(Info)
         BackgroundColor3 = Color3.new(0, 0, 0);
         BorderColor3 = Library.OutlineColor;
         Position = UDim2.new(0, 8, 0, 12);
-        Size = UDim2.new(0, 62, 0, 62);
+        Size = UDim2.new(0, 62, 0, ShowShield and 70 or 62);
         ZIndex = 92;
         Parent = TargetInner;
     });
