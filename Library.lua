@@ -4200,11 +4200,11 @@ do
 
         local Parts = Info.Parts or {
             { Key = 'Head', Text = 'Head', Position = UDim2.fromOffset(96, 4), Size = UDim2.fromOffset(28, 28) };
-            { Key = 'Torso', Text = 'Torso', Position = UDim2.fromOffset(78, 38), Size = UDim2.fromOffset(64, 64) };
-            { Key = 'LeftArm', Text = 'L Arm', Position = UDim2.fromOffset(44, 38), Size = UDim2.fromOffset(28, 64) };
-            { Key = 'RightArm', Text = 'R Arm', Position = UDim2.fromOffset(148, 38), Size = UDim2.fromOffset(28, 64) };
-            { Key = 'LeftLeg', Text = 'L Leg', Position = UDim2.fromOffset(80, 108), Size = UDim2.fromOffset(28, 64) };
-            { Key = 'RightLeg', Text = 'R Leg', Position = UDim2.fromOffset(112, 108), Size = UDim2.fromOffset(28, 64) };
+            { Key = 'Torso', Text = 'Torso', Position = UDim2.fromOffset(78, 34), Size = UDim2.fromOffset(64, 64) };
+            { Key = 'LeftArm', Text = 'L Arm', Position = UDim2.fromOffset(48, 34), Size = UDim2.fromOffset(28, 64) };
+            { Key = 'RightArm', Text = 'R Arm', Position = UDim2.fromOffset(144, 34), Size = UDim2.fromOffset(28, 64) };
+            { Key = 'LeftLeg', Text = 'L Leg', Position = UDim2.fromOffset(80, 100), Size = UDim2.fromOffset(28, 64) };
+            { Key = 'RightLeg', Text = 'R Leg', Position = UDim2.fromOffset(112, 100), Size = UDim2.fromOffset(28, 64) };
         };
 
         local Buttons = {};
@@ -4338,6 +4338,7 @@ do
                 BackgroundColor3 = Library.BackgroundColor;
                 BorderColor3 = Library.OutlineColor;
                 BorderMode = Enum.BorderMode.Inset;
+                Name = Part.Key;
                 Position = Part.Position;
                 Size = Part.Size;
                 ZIndex = 8;
@@ -4352,7 +4353,7 @@ do
 
             local Label = Library:CreateLabel({
                 Size = UDim2.new(1, 0, 1, 0);
-                Text = Part.Text;
+                Text = '';
                 TextSize = 12;
                 TextWrapped = true;
                 ZIndex = 9;
