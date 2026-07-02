@@ -1161,6 +1161,11 @@ function Library:LoadInfiniteYield(Info)
     local Env = getgenv();
     local HasRunner = type(Env.execCmd) == 'function' and type(Env.cmds) == 'table';
 
+    if HasRunner then
+        Env.Toggles = Toggles;
+        Env.Options = Options;
+    end;
+
     if Library.InfiniteYield and HasRunner and not Info.Reload then
         return Library.InfiniteYield;
     elseif Library.InfiniteYield and not HasRunner then
@@ -1207,6 +1212,9 @@ function Library:LoadInfiniteYield(Info)
         if not Ok then
             Library:Notify('Infinite Yield failed to load: ' .. tostring(Result), 6);
         end;
+
+        getgenv().Toggles = Toggles;
+        getgenv().Options = Options;
     end;
 
     task.defer(function()
