@@ -2,10 +2,11 @@
 -- You can suggest changes with a pull request or something
 
 local repo = 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/main/'
+local cacheBust = '?v=' .. tostring(os.time())
 
-local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
-local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
-local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua' .. cacheBust))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua' .. cacheBust))()
+local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua' .. cacheBust))()
 
 local Window = Library:CreateWindow({
     -- Set Center to true if you want the menu to appear in the center
