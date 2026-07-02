@@ -3182,7 +3182,7 @@ do
     Library:AddGradient(WatermarkInner, 'MainColor');
 
     local InnerFrame = Library:Create('Frame', {
-        BackgroundColor3 = Color3.new(1, 1, 1);
+        BackgroundColor3 = Library.MainColor;
         BorderSizePixel = 0;
         Position = UDim2.new(0, 1, 0, 1);
         Size = UDim2.new(1, -2, 1, -2);
@@ -3324,7 +3324,7 @@ function Library:Notify(Text, Time)
     Library:AddGradient(NotifyInner, 'MainColor');
 
     local InnerFrame = Library:Create('Frame', {
-        BackgroundColor3 = Color3.new(1, 1, 1);
+        BackgroundColor3 = Library.MainColor;
         BorderSizePixel = 0;
         Position = UDim2.new(0, 1, 0, 1);
         Size = UDim2.new(1, -2, 1, -2);
@@ -3359,7 +3359,7 @@ function Library:Notify(Text, Time)
     Library:AddToRegistry(LeftColor, {
         BackgroundColor3 = 'AccentColor';
     }, true);
-    Library:AddGradient(LeftColor, 'AccentColor', 0, true, true);
+    Library:AddGradient(LeftColor, 'AccentColor', 0);
 
     pcall(NotifyOuter.TweenSize, NotifyOuter, UDim2.new(0, XSize + 8 + 4, 0, YSize), 'Out', 'Quad', 0.4, true);
 
@@ -3372,6 +3372,254 @@ function Library:Notify(Text, Time)
 
         NotifyOuter:Destroy();
     end);
+end;
+
+function Library:CreateTargetInfo(Info)
+    Info = Info or {};
+
+    local Player = Info.Player or Info.player or LocalPlayer;
+    local ShowShield = Info.shieldBar ~= false and Info.ShieldBar ~= false;
+    local TargetInfo = {
+        Player = nil;
+        Connections = {};
+        Armor = Info.Armor or Info.armor or Info.Shield or Info.shield or 50;
+    };
+
+    local TargetOuter = Library:Create('Frame', {
+        AnchorPoint = Vector2.new(0.5, 1);
+        BorderColor3 = Color3.new(0, 0, 0);
+        Position = Info.Position or UDim2.new(0.5, 0, 1, -120);
+        Size = Info.Size or UDim2.new(0, 270, 0, ShowShield and 104 or 86);
+        Visible = Info.Visible ~= false;
+        ZIndex = 90;
+        Parent = ScreenGui;
+    });
+
+    local TargetInner = Library:Create('Frame', {
+        BackgroundColor3 = Library.MainColor;
+        BorderColor3 = Library.OutlineColor;
+        BorderMode = Enum.BorderMode.Inset;
+        Size = UDim2.new(1, 0, 1, 0);
+        ZIndex = 91;
+        Parent = TargetOuter;
+    });
+
+    Library:AddToRegistry(TargetInner, {
+        BackgroundColor3 = 'MainColor';
+        BorderColor3 = 'OutlineColor';
+    }, true);
+    Library:AddGradient(TargetInner, 'MainColor');
+
+    local AccentBar = Library:Create('Frame', {
+        BackgroundColor3 = Library.AccentColor;
+        BorderSizePixel = 0;
+        Size = UDim2.new(1, 0, 0, 2);
+        ZIndex = 94;
+        Parent = TargetInner;
+    });
+
+    Library:AddToRegistry(AccentBar, {
+        BackgroundColor3 = 'AccentColor';
+    }, true);
+    Library:AddGradient(AccentBar, 'AccentColor', 0);
+
+    local AvatarOuter = Library:Create('Frame', {
+        BackgroundColor3 = Color3.new(0, 0, 0);
+        BorderColor3 = Library.OutlineColor;
+        Position = UDim2.new(0, 8, 0, 12);
+        Size = UDim2.new(0, 62, 0, 62);
+        ZIndex = 92;
+        Parent = TargetInner;
+    });
+
+    Library:AddToRegistry(AvatarOuter, {
+        BorderColor3 = 'OutlineColor';
+    }, true);
+
+    local Avatar = Library:Create('ImageLabel', {
+        BackgroundColor3 = Library.ControlColor;
+        BorderSizePixel = 0;
+        Position = UDim2.new(0, 1, 0, 1);
+        Size = UDim2.new(1, -2, 1, -2);
+        ZIndex = 93;
+        Parent = AvatarOuter;
+    });
+
+    Library:AddToRegistry(Avatar, {
+        BackgroundColor3 = 'ControlColor';
+    }, true);
+
+    local NameLabel = Library:CreateLabel({
+        Position = UDim2.new(0, 78, 0, 11);
+        Size = UDim2.new(1, -86, 0, 18);
+        Text = '';
+        TextSize = 14;
+        TextXAlignment = Enum.TextXAlignment.Left;
+        ZIndex = 93;
+        Parent = TargetInner;
+    }, true);
+
+    local HealthLabel = Library:CreateLabel({
+        Position = UDim2.new(0, 78, 0, 33);
+        Size = UDim2.new(1, -86, 0, 16);
+        Text = 'Health';
+        TextSize = 13;
+        TextXAlignment = Enum.TextXAlignment.Left;
+        ZIndex = 93;
+        Parent = TargetInner;
+    }, true);
+
+    local HealthBack = Library:Create('Frame', {
+        BackgroundColor3 = Library.ControlColor;
+        BorderColor3 = Library.OutlineColor;
+        BorderMode = Enum.BorderMode.Inset;
+        Position = UDim2.new(0, 78, 0, 51);
+        Size = UDim2.new(1, -86, 0, 10);
+        ZIndex = 92;
+        Parent = TargetInner;
+    });
+
+    Library:AddToRegistry(HealthBack, {
+        BackgroundColor3 = 'ControlColor';
+        BorderColor3 = 'OutlineColor';
+    }, true);
+    Library:AddGradient(HealthBack, 'ControlColor');
+
+    local HealthFill = Library:Create('Frame', {
+        BackgroundColor3 = Color3.fromRGB(91, 214, 121);
+        BorderSizePixel = 0;
+        Size = UDim2.new(1, 0, 1, 0);
+        ZIndex = 93;
+        Parent = HealthBack;
+    });
+
+    local ArmorLabel, ArmorBack, ArmorFill;
+
+    if ShowShield then
+        ArmorLabel = Library:CreateLabel({
+            Position = UDim2.new(0, 78, 0, 66);
+            Size = UDim2.new(1, -86, 0, 16);
+            Text = 'Armor';
+            TextSize = 13;
+            TextXAlignment = Enum.TextXAlignment.Left;
+            ZIndex = 93;
+            Parent = TargetInner;
+        }, true);
+
+        ArmorBack = Library:Create('Frame', {
+            BackgroundColor3 = Library.ControlColor;
+            BorderColor3 = Library.OutlineColor;
+            BorderMode = Enum.BorderMode.Inset;
+            Position = UDim2.new(0, 78, 0, 84);
+            Size = UDim2.new(1, -86, 0, 10);
+            ZIndex = 92;
+            Parent = TargetInner;
+        });
+
+        Library:AddToRegistry(ArmorBack, {
+            BackgroundColor3 = 'ControlColor';
+            BorderColor3 = 'OutlineColor';
+        }, true);
+        Library:AddGradient(ArmorBack, 'ControlColor');
+
+        ArmorFill = Library:Create('Frame', {
+            BackgroundColor3 = Color3.fromRGB(64, 139, 255);
+            BorderSizePixel = 0;
+            Size = UDim2.new(0.5, 0, 1, 0);
+            ZIndex = 93;
+            Parent = ArmorBack;
+        });
+    end;
+
+    function TargetInfo:Disconnect()
+        for _, Connection in next, self.Connections do
+            pcall(function()
+                Connection:Disconnect();
+            end);
+        end;
+
+        self.Connections = {};
+    end;
+
+    function TargetInfo:SetArmor(Value)
+        self.Armor = Value;
+
+        if not ArmorFill then
+            return;
+        end;
+
+        local Percent = tonumber(Value) or 0;
+        if Percent > 1 then
+            Percent = Percent / 100;
+        end;
+
+        Percent = math.clamp(Percent, 0, 1);
+        ArmorFill.Size = UDim2.new(Percent, 0, 1, 0);
+        ArmorLabel.Text = string.format('Armor %d%%', math.floor(Percent * 100 + 0.5));
+    end;
+
+    function TargetInfo:SetHealth(Health, MaxHealth)
+        Health = tonumber(Health) or 0;
+        MaxHealth = math.max(tonumber(MaxHealth) or 100, 1);
+
+        local Percent = math.clamp(Health / MaxHealth, 0, 1);
+        HealthFill.Size = UDim2.new(Percent, 0, 1, 0);
+        HealthLabel.Text = string.format('Health %d/%d', math.floor(Health + 0.5), math.floor(MaxHealth + 0.5));
+    end;
+
+    function TargetInfo:SetPlayer(NewPlayer)
+        self:Disconnect();
+        self.Player = NewPlayer or LocalPlayer;
+        local RequestedPlayer = self.Player;
+
+        NameLabel.Text = string.format('%s [%s]', self.Player.DisplayName, self.Player.Name);
+        Avatar.Image = '';
+
+        task.spawn(function()
+            local Ok, Content = pcall(Players.GetUserThumbnailAsync, Players, RequestedPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150);
+            if Ok and self.Player == RequestedPlayer then
+                Avatar.Image = Content;
+            end;
+        end);
+
+        local function BindCharacter(Character)
+            local Humanoid = Character and Character:FindFirstChildOfClass('Humanoid');
+            if not Humanoid and Character then
+                Humanoid = Character:WaitForChild('Humanoid', 3);
+            end;
+
+            if Humanoid then
+                self:SetHealth(Humanoid.Health, Humanoid.MaxHealth);
+                table.insert(self.Connections, Humanoid.HealthChanged:Connect(function()
+                    self:SetHealth(Humanoid.Health, Humanoid.MaxHealth);
+                end));
+                table.insert(self.Connections, Humanoid:GetPropertyChangedSignal('MaxHealth'):Connect(function()
+                    self:SetHealth(Humanoid.Health, Humanoid.MaxHealth);
+                end));
+            else
+                self:SetHealth(0, 100);
+            end;
+        end;
+
+        table.insert(self.Connections, self.Player.CharacterAdded:Connect(BindCharacter));
+        BindCharacter(self.Player.Character);
+        self:SetArmor(self.Armor);
+    end;
+
+    function TargetInfo:SetVisible(Visible)
+        TargetOuter.Visible = Visible;
+    end;
+
+    function TargetInfo:Destroy()
+        self:Disconnect();
+        TargetOuter:Destroy();
+    end;
+
+    TargetInfo.Holder = TargetOuter;
+    Library:MakeDraggable(TargetOuter, 999);
+    TargetInfo:SetPlayer(Player);
+
+    return TargetInfo;
 end;
 
 function Library:CreateWindow(...)
