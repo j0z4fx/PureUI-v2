@@ -1,7 +1,7 @@
 -- New example script written by wally
 -- You can suggest changes with a pull request or something
 
-local repo = 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/ef88c04/'
+local repo = 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/24423c8/'
 local cacheBust = '?v=' .. tostring(os.time())
 
 local Library = loadstring(game:HttpGet(repo .. 'Library.lua' .. cacheBust))()
@@ -12,6 +12,49 @@ local Players = game:GetService('Players')
 local TargetInfo = Library:CreateTargetInfo({
     Player = Players.LocalPlayer,
     -- shieldBar = false,
+})
+
+local PlayerList = Library:CreatePlayerList({
+    Title = 'Players',
+})
+
+PlayerList:AddButton({
+    Text = 'Teleport',
+    Func = function(Player)
+        local LocalRoot = Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChild('HumanoidRootPart')
+        local TargetRoot = Player and Player.Character and Player.Character:FindFirstChild('HumanoidRootPart')
+
+        if LocalRoot and TargetRoot then
+            LocalRoot.CFrame = TargetRoot.CFrame * CFrame.new(0, 0, -3)
+        end
+    end,
+})
+
+PlayerList:AddButton({
+    Text = 'Fling',
+    Func = function(Player)
+        Library:Notify(Player and ('Fling selected: ' .. Player.Name) or 'No player selected', 2)
+    end,
+})
+
+PlayerList:AddToggle('SpectatePlayer', {
+    Text = 'Spectate',
+    Default = false,
+    Callback = function(Value, Player)
+        local Camera = workspace.CurrentCamera
+
+        if Value and Player and Player.Character then
+            local Humanoid = Player.Character:FindFirstChildOfClass('Humanoid')
+            if Humanoid then
+                Camera.CameraSubject = Humanoid
+            end
+        elseif Players.LocalPlayer.Character then
+            local Humanoid = Players.LocalPlayer.Character:FindFirstChildOfClass('Humanoid')
+            if Humanoid then
+                Camera.CameraSubject = Humanoid
+            end
+        end
+    end,
 })
 
 local Window = Library:CreateWindow({
