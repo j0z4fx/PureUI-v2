@@ -200,6 +200,123 @@ function Library:MakeDraggable(Instance, Cutoff)
     end)
 end;
 
+function Library:MakeResizable(Instance, DefaultSize)
+    local MinSize = Vector2.new(DefaultSize.X * 0.8, DefaultSize.Y * 0.8);
+    local MaxSize = Vector2.new(DefaultSize.X * 2, DefaultSize.Y * 2);
+    local EdgeZIndex = 110;
+
+    local EdgeFrames = {
+        Left = Library:Create('Frame', {
+            BackgroundColor3 = Library.AccentColor;
+            BorderSizePixel = 0;
+            Position = UDim2.new(0, 0, 0, 0);
+            Size = UDim2.new(0, 2, 1, 0);
+            Visible = false;
+            ZIndex = EdgeZIndex;
+            Parent = Instance;
+        });
+        Right = Library:Create('Frame', {
+            AnchorPoint = Vector2.new(1, 0);
+            BackgroundColor3 = Library.AccentColor;
+            BorderSizePixel = 0;
+            Position = UDim2.new(1, 0, 0, 0);
+            Size = UDim2.new(0, 2, 1, 0);
+            Visible = false;
+            ZIndex = EdgeZIndex;
+            Parent = Instance;
+        });
+        Top = Library:Create('Frame', {
+            BackgroundColor3 = Library.AccentColor;
+            BorderSizePixel = 0;
+            Position = UDim2.new(0, 0, 0, 0);
+            Size = UDim2.new(1, 0, 0, 2);
+            Visible = false;
+            ZIndex = EdgeZIndex;
+            Parent = Instance;
+        });
+        Bottom = Library:Create('Frame', {
+            AnchorPoint = Vector2.new(0, 1);
+            BackgroundColor3 = Library.AccentColor;
+            BorderSizePixel = 0;
+            Position = UDim2.new(0, 0, 1, 0);
+            Size = UDim2.new(1, 0, 0, 2);
+            Visible = false;
+            ZIndex = EdgeZIndex;
+            Parent = Instance;
+        });
+    };
+
+    for _, EdgeFrame in next, EdgeFrames do
+        Library:AddToRegistry(EdgeFrame, {
+            BackgroundColor3 = 'AccentColor';
+        });
+    end;
+
+    local function SetActiveEdges(Edges, Visible)
+        for Name, EdgeFrame in next, EdgeFrames do
+            EdgeFrame.Visible = Visible and Edges[Name] or false;
+        end;
+    end;
+
+    local function BeginResize(Edges)
+        local StartMouse = Vector2.new(Mouse.X, Mouse.Y);
+        local StartPosition = Instance.AbsolutePosition;
+        local StartSize = Instance.AbsoluteSize;
+        local StartRight = StartPosition.X + StartSize.X;
+        local StartBottom = StartPosition.Y + StartSize.Y;
+        local Anchor = Instance.AnchorPoint;
+
+        SetActiveEdges(Edges, true);
+
+        while InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) do
+            local Delta = Vector2.new(Mouse.X, Mouse.Y) - StartMouse;
+            local NewWidth = StartSize.X + (Edges.Right and Delta.X or 0) - (Edges.Left and Delta.X or 0);
+            local NewHeight = StartSize.Y + (Edges.Bottom and Delta.Y or 0) - (Edges.Top and Delta.Y or 0);
+
+            NewWidth = math.clamp(NewWidth, MinSize.X, MaxSize.X);
+            NewHeight = math.clamp(NewHeight, MinSize.Y, MaxSize.Y);
+
+            local NewX = Edges.Left and (StartRight - NewWidth) or StartPosition.X;
+            local NewY = Edges.Top and (StartBottom - NewHeight) or StartPosition.Y;
+
+            Instance.Size = UDim2.fromOffset(NewWidth, NewHeight);
+            Instance.Position = UDim2.fromOffset(NewX + (NewWidth * Anchor.X), NewY + (NewHeight * Anchor.Y));
+
+            RenderStepped:Wait();
+        end;
+
+        SetActiveEdges(Edges, false);
+    end;
+
+    local Handles = {
+        { Edges = { Top = true }, Position = UDim2.new(0, 8, 0, -3), Size = UDim2.new(1, -16, 0, 6) };
+        { Edges = { Bottom = true }, Position = UDim2.new(0, 8, 1, -3), Size = UDim2.new(1, -16, 0, 6) };
+        { Edges = { Left = true }, Position = UDim2.new(0, -3, 0, 8), Size = UDim2.new(0, 6, 1, -16) };
+        { Edges = { Right = true }, Position = UDim2.new(1, -3, 0, 8), Size = UDim2.new(0, 6, 1, -16) };
+        { Edges = { Top = true, Left = true }, Position = UDim2.new(0, -3, 0, -3), Size = UDim2.new(0, 11, 0, 11) };
+        { Edges = { Top = true, Right = true }, Position = UDim2.new(1, -8, 0, -3), Size = UDim2.new(0, 11, 0, 11) };
+        { Edges = { Bottom = true, Left = true }, Position = UDim2.new(0, -3, 1, -8), Size = UDim2.new(0, 11, 0, 11) };
+        { Edges = { Bottom = true, Right = true }, Position = UDim2.new(1, -8, 1, -8), Size = UDim2.new(0, 11, 0, 11) };
+    };
+
+    for _, HandleInfo in next, Handles do
+        local Handle = Library:Create('Frame', {
+            Active = true;
+            BackgroundTransparency = 1;
+            Position = HandleInfo.Position;
+            Size = HandleInfo.Size;
+            ZIndex = EdgeZIndex + 1;
+            Parent = Instance;
+        });
+
+        Handle.InputBegan:Connect(function(Input)
+            if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+                BeginResize(HandleInfo.Edges);
+            end;
+        end);
+    end;
+end;
+
 function Library:AddToolTip(InfoStr, HoverInstance)
     local X, Y = Library:GetTextBounds(InfoStr, Library.Font, 14);
     local Tooltip = Library:Create('Frame', {
@@ -2277,7 +2394,6 @@ do
             Min = Info.Min;
             Max = Info.Max;
             Rounding = Info.Rounding;
-            MaxSize = 232;
             Type = 'Slider';
             Callback = Info.Callback or function(Value) end;
         };
@@ -2387,10 +2503,12 @@ do
                 DisplayLabel.Text = string.format('%s/%s', Slider.Value .. Suffix, Slider.Max .. Suffix);
             end
 
-            local X = math.ceil(Library:MapValue(Slider.Value, Slider.Min, Slider.Max, 0, Slider.MaxSize));
-            Library:Tween(Fill, 0.08, { Size = UDim2.new(0, X, 1, 0) });
+            local Range = Slider.Max - Slider.Min;
+            local Percent = Range == 0 and 1 or math.clamp((Slider.Value - Slider.Min) / Range, 0, 1);
+            local FillOffset = Percent == 1 and 2 or 0;
+            Library:Tween(Fill, 0.08, { Size = UDim2.new(Percent, FillOffset, 1, 0) });
 
-            HideBorderRight.Visible = not (X == Slider.MaxSize or X == 0);
+            HideBorderRight.Visible = Percent > 0 and Percent < 1;
         end;
 
         function Slider:OnChanged(Func)
@@ -2408,7 +2526,7 @@ do
         end;
 
         function Slider:GetValueFromXOffset(X)
-            return Round(Library:MapValue(X, 0, Slider.MaxSize, Slider.Min, Slider.Max));
+            return Round(Library:MapValue(X, 0, math.max(SliderInner.AbsoluteSize.X, 1), Slider.Min, Slider.Max));
         end;
 
         function Slider:SetValue(Str)
@@ -2429,14 +2547,8 @@ do
 
         SliderInner.InputBegan:Connect(function(Input)
             if Input.UserInputType == Enum.UserInputType.MouseButton1 and not Library:MouseIsOverOpenedFrame() then
-                local mPos = Mouse.X;
-                local gPos = Fill.Size.X.Offset;
-                local Diff = mPos - (Fill.AbsolutePosition.X + gPos);
-
                 while InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) do
-                    local nMPos = Mouse.X;
-                    local nX = math.clamp(gPos + (nMPos - mPos) + Diff, 0, Slider.MaxSize);
-
+                    local nX = math.clamp(Mouse.X - SliderInner.AbsolutePosition.X, 0, math.max(SliderInner.AbsoluteSize.X, 1));
                     local nValue = Slider:GetValueFromXOffset(nX);
                     local OldValue = Slider.Value;
                     Slider.Value = nValue;
@@ -3300,7 +3412,10 @@ function Library:CreateWindow(...)
         Parent = ScreenGui;
     });
 
+    local DefaultResizeSize = Vector2.new(math.max(Config.Size.X.Offset, 1), math.max(Config.Size.Y.Offset, 1));
+
     Library:MakeDraggable(Outer, 25);
+    Library:MakeResizable(Outer, DefaultResizeSize);
 
     local Inner = Library:Create('Frame', {
         BackgroundColor3 = Library.MainColor;
