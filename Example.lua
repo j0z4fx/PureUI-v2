@@ -1,7 +1,7 @@
 -- New example script written by wally
 -- You can suggest changes with a pull request or something
 
-local repo = 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/7f7d8d7/'
+local repo = 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/bd06f18/'
 local cacheBust = '?v=' .. tostring(os.time())
 
 local Library = loadstring(game:HttpGet(repo .. 'Library.lua' .. cacheBust))()
@@ -426,6 +426,15 @@ Tab1:AddToggle('Tab1Toggle', { Text = 'Tab1 Toggle' });
 
 local Tab2 = TabBox:AddTab('Tab 2')
 Tab2:AddToggle('Tab2Toggle', { Text = 'Tab2 Toggle' });
+
+local BodyGroupbox = Tabs.Main:AddRightGroupbox('R6 hitbox selector');
+BodyGroupbox:AddBodySelector('BodyParts', {
+    Text = 'Body parts',
+    Default = { Head = true, Torso = true },
+    Callback = function(Value)
+        print('[cb] Body parts changed:', Value)
+    end,
+})
 
 -- Dependency boxes let us control the visibility of UI elements depending on another UI elements state.
 -- e.g. we have a 'Feature Enabled' toggle, and we only want to show that features sliders, dropdowns etc when it's enabled!
