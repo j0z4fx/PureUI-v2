@@ -1,7 +1,7 @@
 -- New example script written by wally
 -- You can suggest changes with a pull request or something
 
-local repo = 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/439fa89/'
+local repo = 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/9aabb53/'
 local cacheBust = '?v=' .. tostring(os.time())
 
 local Library = loadstring(game:HttpGet(repo .. 'Library.lua' .. cacheBust))()
@@ -429,7 +429,6 @@ Tab2:AddToggle('Tab2Toggle', { Text = 'Tab2 Toggle' });
 
 local BodyGroupbox = Tabs.Main:AddRightGroupbox('R6 hitbox selector');
 BodyGroupbox:AddBodySelector('BodyParts', {
-    Text = 'Body parts',
     Default = { Head = true, Torso = true },
     Callback = function(Value)
         print('[cb] Body parts changed:', Value)
