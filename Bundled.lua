@@ -368,20 +368,16 @@ function Library:GetGradientSequence(Color)
     });
 end;
 
--- Shimmer sequence used by animated accent lines. Two identical bright pulses
--- sit at 0.25 and 0.75 -- symmetric and exactly half a tile apart. As Offset
--- sweeps 0 -> -0.5 the whole pattern shifts by half a tile: each pulse lands
--- where the other one was, so the line looks identical at both ends of the
--- sweep and the wrap is invisible. Because the pulses are spaced across the
--- whole gradient (not bunched in the middle), the full width of the line is
--- always near a pulse -- no dead zones, no "only half animated". While one
--- pulse exits a side the other enters from the opposite side, so motion reads
--- as continuous travel rather than a pulse popping back to center.
-function Library:GetShimmerSequence(Color)
+-- Shimmer colors for the animated accent lines. The actual motion is produced
+-- by AnimateGradient, which rebuilds the gradient's ColorSequence every frame
+-- so a bright pulse genuinely travels right -> left and wraps via modulo. This
+-- is seamless by construction: there is no clamped offset sweep to expose a
+-- seam, and both endpoints (0 and 1) stay at the base accent so the pulse can
+-- cross any boundary without popping.
+
+function Library:GetShimmerColors(Color)
     local Base = (typeof(Color) == 'Color3' and Color) or Library.AccentColor;
 
-    -- Brighten the accent for the travelling highlights. Clamp via fromRGB so
-    -- we never overflow past white.
     local function Brighter(C, Amount)
         return Color3.fromRGB(
             math.min(255, math.floor(C.R * 255 + Amount)),
@@ -390,23 +386,59 @@ function Library:GetShimmerSequence(Color)
         );
     end;
 
-    local Hi = Brighter(Base, 80);
-    local Mid = Brighter(Base, 30);
+    return {
+        Base = Base;
+        Hi = Brighter(Base, 90);
+    };
+end;
 
-    -- Half-width of each pulse. Two pulses at 0.25 and 0.75 with this width
-    -- tile the 0..1 range so every point on the line passes through a pulse
-    -- during a half-tile sweep.
-    local P = 0.085;
+-- Build the ColorSequence for a pulse whose center is at `Center` in [0, 1).
+-- The pulse WRAPS across the 0/1 seam: distance from the center is measured
+-- around the unit circle, so when the pulse slides off the left edge it
+-- simultaneously appears at the right edge. This is real tiling -- no teleport,
+-- no spawn-in -- and because wrapped distance is identical at positions 0 and 1,
+-- the two endpoints always match, which is exactly what ColorSequence requires.
+function Library:BuildShimmerSequence(Colors, Center, HalfWidth)
+    local Base, Hi = Colors.Base, Colors.Hi;
 
+    local function lerp(a, b, t)
+        return a + (b - a) * t;
+    end;
+
+    -- Wrapped (circular) distance from the center, in [0, 0.5].
+    local function wrapDist(P)
+        local d = math.abs(P - Center) % 1;
+        return d > 0.5 and (1 - d) or d;
+    end;
+
+    -- Cosine pulse: 1 at center, 0 at HalfWidth, nil beyond.
+    local function bright(P)
+        local d = wrapDist(P) / HalfWidth;
+        if d >= 1 then return 0 end;
+        return 0.5 - 0.5 * math.cos((1 - d) * math.pi);
+    end;
+
+    -- Sample the full [0, 1] range. Endpoint samples (0 and 1) have identical
+    -- wrapped distance, so they always get the same color.
+    local N = 40;
+    local Keypoints = {};
+    for i = 0, N do
+        local P = i / N;
+        local t = bright(P);
+        local C = Color3.new(lerp(Base.R, Hi.R, t), lerp(Base.G, Hi.G, t), lerp(Base.B, Hi.B, t));
+        Keypoints[#Keypoints + 1] = ColorSequenceKeypoint.new(P, C);
+    end;
+
+    return ColorSequence.new(Keypoints);
+end;
+
+function Library:GetShimmerSequence(Color)
+    -- Static fallback (used before the animation starts or for non-animated
+    -- callers). Just a flat accent bar with no travelling pulse.
+    local Colors = Library:GetShimmerColors(Color);
     return ColorSequence.new({
-        ColorSequenceKeypoint.new(0,            Mid),
-        ColorSequenceKeypoint.new(0.25 - P,     Base),
-        ColorSequenceKeypoint.new(0.25,         Hi),
-        ColorSequenceKeypoint.new(0.25 + P,     Base),
-        ColorSequenceKeypoint.new(0.75 - P,     Base),
-        ColorSequenceKeypoint.new(0.75,         Hi),
-        ColorSequenceKeypoint.new(0.75 + P,     Base),
-        ColorSequenceKeypoint.new(1,            Mid),
+        ColorSequenceKeypoint.new(0, Colors.Base);
+        ColorSequenceKeypoint.new(1, Colors.Base);
     });
 end;
 
@@ -427,6 +459,13 @@ function Library:AddGradient(Instance, Color, Rotation, Animated, Shimmer)
     end;
 
     if Animated then
+        if Shimmer then
+            -- Stash the resolved shimmer colors on the gradient so the per-frame
+            -- loop can rebuild the ColorSequence, and so SetGradientColor can
+            -- refresh them when the accent changes.
+            Gradient.ShimmerColors = Library:GetShimmerColors(Color);
+            Gradient.ShimmerRotation = Rotation or 90;
+        end;
         Library:AnimateGradient(Gradient, Rotation);
     end;
 
@@ -434,14 +473,18 @@ function Library:AddGradient(Instance, Color, Rotation, Animated, Shimmer)
 end;
 
 function Library:AnimateGradient(Gradient, Rotation)
-    -- The shimmer sequence holds two pulses half a tile apart, so the pattern
-    -- repeats every HALF tile. Sweep Offset across exactly that range (0 to
-    -- -0.5): at both ends the line looks identical (each pulse sits where the
-    -- other was), so the wrap is invisible. One cycle = half a tile = one
-    -- pulse-width of travel; double the per-second rate so perceived speed
-    -- stays the same.
+    -- Shimmer path: rebuild the ColorSequence every frame so a bright pulse
+    -- genuinely travels right -> left. The pulse center starts at 1 (right edge)
+    -- and decreases toward 0 (left edge); when it would drop below 0 it wraps
+    -- back to 1 via modulo and re-emerges at the right. Because we author the
+    -- color at every point ourselves (no clamped offset shift), the wrap is a
+    -- pure mathematical mod with no discontinuity, and endpoints 0 and 1 are
+    -- always base accent so the pulse crosses boundaries without popping.
+    --
+    -- Non-shimmer gradients have no ShimmerColors and are left static.
     local StartedAt = os.clock();
-    local Speed = 0.5; -- half-tiles per second
+    local Speed = 0.45;        -- pulse cycles per second (right -> left)
+    local HalfWidth = 0.09;    -- pulse half-width as a fraction of the line
     local Connection;
 
     Connection = RenderStepped:Connect(function()
@@ -450,12 +493,19 @@ function Library:AnimateGradient(Gradient, Rotation)
             return;
         end;
 
-        local Offset = -0.5 * (((os.clock() - StartedAt) * Speed) % 1);
-        if (Rotation or Gradient.Rotation) == 0 then
-            Gradient.Offset = Vector2.new(Offset, 0);
-        else
-            Gradient.Offset = Vector2.new(0, Offset);
+        local Colors = Gradient.ShimmerColors;
+        if not Colors then
+            return;
         end;
+
+        -- Phase in [0, 1). Subtract from 1 so the center moves from 1 down to
+        -- 0 -- i.e. right to left.
+        local Phase = ((os.clock() - StartedAt) * Speed) % 1;
+        local Center = 1 - Phase;
+
+        Gradient.Color = Library:BuildShimmerSequence(Colors, Center, HalfWidth);
+        -- No offset shift; the pulse position is encoded in the ColorSequence.
+        Gradient.Offset = Vector2.new(0, 0);
     end);
 
     Library:GiveSignal(Connection);
@@ -486,9 +536,14 @@ function Library:SetGradientColor(Instance, Color)
     end;
 
     if Gradient then
-        Gradient.Color = (Reg and Reg.GradientShimmer)
-            and Library:GetShimmerSequence(Color)
-            or Library:GetGradientSequence(Color);
+        if Reg and Reg.GradientShimmer then
+            -- Animated shimmer: refresh the resolved colors the per-frame loop
+            -- reads. The loop will rebuild the ColorSequence itself next frame,
+            -- so we don't write Gradient.Color here.
+            Gradient.ShimmerColors = Library:GetShimmerColors(Color);
+        else
+            Gradient.Color = Library:GetGradientSequence(Color);
+        end;
     end;
 end;
 
@@ -562,9 +617,14 @@ function Library:UpdateColorsUsingRegistry()
         end;
 
         if Object.Gradient then
-            Object.Gradient.Color = (Object.GradientShimmer)
-                and Library:GetShimmerSequence(Object.GradientColor or Object.Properties.BackgroundColor3)
-                or Library:GetGradientSequence(Object.GradientColor or Object.Properties.BackgroundColor3);
+            local GColor = Object.GradientColor or Object.Properties.BackgroundColor3;
+            if Object.GradientShimmer then
+                -- Refresh resolved shimmer colors; the per-frame loop rebuilds
+                -- the ColorSequence itself next frame.
+                Object.Gradient.ShimmerColors = Library:GetShimmerColors(GColor);
+            else
+                Object.Gradient.Color = Library:GetGradientSequence(GColor);
+            end;
         end;
     end;
 end;
