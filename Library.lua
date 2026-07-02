@@ -389,23 +389,9 @@ function Library:GetShimmerColors(Color)
     };
 end;
 
--- Build the ColorSequence for a pulse whose center is at `Center` in [0, 1).
--- Build the ColorSequence for a pulse whose center is at `Center` (any real;
--- the animation drives it from 1 down toward 0, i.e. right -> left).
---
--- The pulse travels LINEARLY across the full width and wraps at the seam by
--- SPLITTING: when part of it spills past the left edge (Center near 0) that part
--- re-enters at the right edge, and vice-versa. We get this by sampling three
--- copies of the pulse centered at Center-1, Center, and Center+1, each using
--- plain linear distance -- only the copies that intersect [0,1] contribute.
---
--- This is what makes the flow continuous and one-directional: distance within
--- each copy is linear, so as Center decreases the bright band sweeps across the
--- whole width every cycle instead of bouncing between edge and center (which is
--- what the earlier circular-distance version did, and why it appeared to freeze
--- while the pulse sat at the edges). Because position 0 and 1 see the same set
--- of contributing copies, the two endpoints match -- exactly what ColorSequence
--- requires.
+-- Build the ColorSequence for a pulse whose center may sit outside [0, 1].
+-- The animation moves it right -> left across a wider offscreen range and resets
+-- only while the visible bar is flat base color, so the loop has no edge hold.
 function Library:BuildShimmerSequence(Colors, Center, HalfWidth)
     local Base, Hi = Colors.Base, Colors.Hi;
 
@@ -413,24 +399,11 @@ function Library:BuildShimmerSequence(Colors, Center, HalfWidth)
         return a + (b - a) * t;
     end;
 
-    -- Brightness contributed by a single pulse copy centered at `Origin`, using
-    -- plain linear distance. Cosine shape: 1 at Origin, 0 at HalfWidth, 0 beyond.
-    local function brightAt(P, Origin)
-        local d = math.abs(P - Origin) / HalfWidth;
+    local function bright(P)
+        local d = math.abs(P - Center) / HalfWidth;
         if d >= 1 then return 0 end;
         return 0.5 - 0.5 * math.cos((1 - d) * math.pi);
     end;
-
-    -- A screen position may be covered by more than one copy (near the seam),
-    -- so take the max contribution across all copies.
-    local function bright(P)
-        local Best = 0;
-        for _, Origin in next, { Center - 1, Center, Center + 1 } do
-            local b = brightAt(P, Origin);
-            if b > Best then Best = b end;
-        end
-        return Best;
-    end
 
     local function colorAt(P)
         local t = bright(P);
@@ -438,9 +411,7 @@ function Library:BuildShimmerSequence(Colors, Center, HalfWidth)
     end;
 
     -- ColorSequence caps at 32 keypoints. The line is flat Base except inside
-    -- the pulse, so only sample each pulse region that intersects [0,1]
-    -- (Samples points each), then add base endpoints. Worst case two regions
-    -- -> ~22 keypoints, well under the cap, shape stays crisp.
+    -- the pulse, so sample only the visible slice of the pulse.
     local Keypoints = {};
 
     local function push(P, C)
@@ -453,18 +424,18 @@ function Library:BuildShimmerSequence(Colors, Center, HalfWidth)
 
     local Samples = 10;
     push(0, colorAt(0));
-    for _, Origin in next, { Center - 1, Center, Center + 1 } do
-        local Lo = Origin - HalfWidth;
-        local HiPos = Origin + HalfWidth;
-        if HiPos > 0 and Lo < 1 then
-            local A = math.max(0, Lo);
-            local B = math.min(1, HiPos);
-            for i = 0, Samples do
-                local P = A + (B - A) * (i / Samples);
-                push(P, colorAt(P));
-            end;
+
+    local Lo = Center - HalfWidth;
+    local HiPos = Center + HalfWidth;
+    if HiPos > 0 and Lo < 1 then
+        local A = math.max(0, Lo);
+        local B = math.min(1, HiPos);
+        for i = 0, Samples do
+            local P = A + (B - A) * (i / Samples);
+            push(P, colorAt(P));
         end;
-    end;
+    end
+
     push(1, colorAt(1));
 
     return ColorSequence.new(Keypoints);
@@ -515,16 +486,13 @@ end;
 
 function Library:AnimateGradient(Gradient, Rotation)
     -- Shimmer path: rebuild the ColorSequence every frame so a bright pulse
-    -- genuinely travels right -> left. The pulse center starts at 1 (right edge)
-    -- and decreases toward 0 (left edge); when it would drop below 0 it wraps
-    -- back to 1 via modulo and re-emerges at the right. Because we author the
-    -- color at every point ourselves (no clamped offset shift), the wrap is a
-    -- pure mathematical mod with no discontinuity, and endpoints 0 and 1 are
-    -- always base accent so the pulse crosses boundaries without popping.
+    -- genuinely travels right -> left. The center starts just off the right
+    -- edge and exits just off the left; the modulo reset happens while the
+    -- visible gradient is flat, which removes the edge freeze/pause.
     --
     -- Non-shimmer gradients have no entry in ShimmerGradients and are left static.
     local StartedAt = os.clock();
-    local Speed = 0.45;        -- pulse cycles per second (right -> left)
+    local Speed = 0.55; -- gradient-widths per second (right -> left)
     local Connection;
 
     Connection = RenderStepped:Connect(function()
@@ -540,12 +508,12 @@ function Library:AnimateGradient(Gradient, Rotation)
             return;
         end;
 
-        -- Phase in [0, 1). Subtract from 1 so the center moves from 1 down to
-        -- 0 -- i.e. right to left.
-        local Phase = ((os.clock() - StartedAt) * Speed) % 1;
-        local Center = 1 - Phase;
+        local HalfWidth = State.HalfWidth;
+        local Travel = 1 + (HalfWidth * 2);
+        local Phase = ((os.clock() - StartedAt) * Speed) % Travel;
+        local Center = 1 + HalfWidth - Phase;
 
-        Gradient.Color = Library:BuildShimmerSequence(State.Colors, Center, State.HalfWidth);
+        Gradient.Color = Library:BuildShimmerSequence(State.Colors, Center, HalfWidth);
         -- No offset shift; the pulse position is encoded in the ColorSequence.
         Gradient.Offset = Vector2.new(0, 0);
     end);
