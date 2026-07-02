@@ -2550,22 +2550,33 @@ do
             Parent = DropdownInner;
         });
 
-        local DropdownPlus = Library:CreateLabel({
+        local DropdownPlus = Library:Create('TextLabel', {
+            BackgroundTransparency = 1;
+            Font = Library.Font;
             Size = UDim2.new(1, 0, 1, 0);
             Text = '+';
+            TextColor3 = Library.FontColor;
             TextSize = 16;
+            TextStrokeTransparency = 1;
             ZIndex = 9;
             Parent = DropdownIconFrame;
         });
 
-        local DropdownMinus = Library:CreateLabel({
+        local DropdownMinus = Library:Create('TextLabel', {
+            BackgroundTransparency = 1;
+            Font = Library.Font;
             Size = UDim2.new(1, 0, 1, 0);
             Text = '-';
+            TextColor3 = Library.FontColor;
             TextSize = 16;
             TextTransparency = 1;
+            TextStrokeTransparency = 1;
             ZIndex = 9;
             Parent = DropdownIconFrame;
         });
+
+        Library:AddToRegistry(DropdownPlus, { TextColor3 = 'FontColor' });
+        Library:AddToRegistry(DropdownMinus, { TextColor3 = 'FontColor' });
 
         local ItemList = Library:CreateLabel({
             Position = UDim2.new(0, 5, 0, 0);
