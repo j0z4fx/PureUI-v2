@@ -347,10 +347,14 @@ function Library:ResolveColor(Color)
 end;
 
 function Library:GetGradientSequence(Color)
+    -- Seam must be invisible for the offset animation to loop cleanly, so the
+    -- color at 0 is repeated at 1. Keypoints describe a single tile that can be
+    -- laid end to end without a visible join.
     return ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-        ColorSequenceKeypoint.new(0.56, Color3.fromRGB(247, 247, 247)),
-        ColorSequenceKeypoint.new(0.84, Color3.fromRGB(216, 216, 216)),
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(176, 176, 176)),
+        ColorSequenceKeypoint.new(0.25, Color3.fromRGB(255, 255, 255)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(247, 247, 247)),
+        ColorSequenceKeypoint.new(0.75, Color3.fromRGB(216, 216, 216)),
         ColorSequenceKeypoint.new(1, Color3.fromRGB(176, 176, 176)),
     });
 end;
@@ -378,7 +382,12 @@ function Library:AddGradient(Instance, Color, Rotation, Animated)
 end;
 
 function Library:AnimateGradient(Gradient, Rotation)
+    -- The gradient sequence tiles seamlessly (color at 0 == color at 1), so we
+    -- can sweep the offset across exactly one tile and wrap without a visible
+    -- seam. Driving it with a smooth easing-friendly continuous phase keeps the
+    -- motion even instead of the previous linear sawtooth that snapped on reset.
     local StartedAt = os.clock();
+    local Speed = 0.18; -- tiles per second
     local Connection;
 
     Connection = RenderStepped:Connect(function()
@@ -387,7 +396,9 @@ function Library:AnimateGradient(Gradient, Rotation)
             return;
         end;
 
-        local Offset = ((os.clock() - StartedAt) * 0.35) % 2 - 1;
+        -- One full tile per cycle. Offset is negated so the shimmer travels in
+        -- the natural reading direction of the accent stroke.
+        local Offset = -(((os.clock() - StartedAt) * Speed) % 1);
         if (Rotation or Gradient.Rotation) == 0 then
             Gradient.Offset = Vector2.new(Offset, 0);
         else
