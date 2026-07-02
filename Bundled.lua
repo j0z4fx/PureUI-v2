@@ -399,11 +399,22 @@ function Library:GetShimmerColors(Color)
 end;
 
 -- Build the ColorSequence for a pulse whose center is at `Center` in [0, 1).
--- The pulse WRAPS across the 0/1 seam: distance from the center is measured
--- around the unit circle, so when the pulse slides off the left edge it
--- simultaneously appears at the right edge. This is real tiling -- no teleport,
--- no spawn-in -- and because wrapped distance is identical at positions 0 and 1,
--- the two endpoints always match, which is exactly what ColorSequence requires.
+-- Build the ColorSequence for a pulse whose center is at `Center` (any real;
+-- the animation drives it from 1 down toward 0, i.e. right -> left).
+--
+-- The pulse travels LINEARLY across the full width and wraps at the seam by
+-- SPLITTING: when part of it spills past the left edge (Center near 0) that part
+-- re-enters at the right edge, and vice-versa. We get this by sampling three
+-- copies of the pulse centered at Center-1, Center, and Center+1, each using
+-- plain linear distance -- only the copies that intersect [0,1] contribute.
+--
+-- This is what makes the flow continuous and one-directional: distance within
+-- each copy is linear, so as Center decreases the bright band sweeps across the
+-- whole width every cycle instead of bouncing between edge and center (which is
+-- what the earlier circular-distance version did, and why it appeared to freeze
+-- while the pulse sat at the edges). Because position 0 and 1 see the same set
+-- of contributing copies, the two endpoints match -- exactly what ColorSequence
+-- requires.
 function Library:BuildShimmerSequence(Colors, Center, HalfWidth)
     local Base, Hi = Colors.Base, Colors.Hi;
 
@@ -411,18 +422,24 @@ function Library:BuildShimmerSequence(Colors, Center, HalfWidth)
         return a + (b - a) * t;
     end;
 
-    -- Wrapped (circular) distance from the center, in [0, 0.5].
-    local function wrapDist(P)
-        local d = math.abs(P - Center) % 1;
-        return d > 0.5 and (1 - d) or d;
-    end;
-
-    -- Cosine pulse brightness: 1 at center, 0 at HalfWidth, 0 beyond.
-    local function bright(P)
-        local d = wrapDist(P) / HalfWidth;
+    -- Brightness contributed by a single pulse copy centered at `Origin`, using
+    -- plain linear distance. Cosine shape: 1 at Origin, 0 at HalfWidth, 0 beyond.
+    local function brightAt(P, Origin)
+        local d = math.abs(P - Origin) / HalfWidth;
         if d >= 1 then return 0 end;
         return 0.5 - 0.5 * math.cos((1 - d) * math.pi);
     end;
+
+    -- A screen position may be covered by more than one copy (near the seam),
+    -- so take the max contribution across all copies.
+    local function bright(P)
+        local Best = 0;
+        for _, Origin in next, { Center - 1, Center, Center + 1 } do
+            local b = brightAt(P, Origin);
+            if b > Best then Best = b end;
+        end
+        return Best;
+    end
 
     local function colorAt(P)
         local t = bright(P);
@@ -430,15 +447,12 @@ function Library:BuildShimmerSequence(Colors, Center, HalfWidth)
     end;
 
     -- ColorSequence caps at 32 keypoints. The line is flat Base except inside
-    -- the pulse (within HalfWidth of the center, including its wrapped copy), so
-    -- we only need: a base endpoint at 0, a handful of samples across each pulse
-    -- region that intersects [0,1], and a base endpoint at 1. Stays well under
-    -- the cap and keeps the pulse shape crisp instead of blurring it across a
-    -- coarse uniform grid.
+    -- the pulse, so only sample each pulse region that intersects [0,1]
+    -- (Samples points each), then add base endpoints. Worst case two regions
+    -- -> ~22 keypoints, well under the cap, shape stays crisp.
     local Keypoints = {};
 
     local function push(P, C)
-        -- Clamp tiny float drift and skip duplicates at the same time.
         if P < 0 then P = 0 elseif P > 1 then P = 1 end;
         if #Keypoints > 0 and math.abs(Keypoints[#Keypoints].Time - P) < 1e-4 then
             return;
@@ -446,14 +460,11 @@ function Library:BuildShimmerSequence(Colors, Center, HalfWidth)
         Keypoints[#Keypoints + 1] = ColorSequenceKeypoint.new(P, C);
     end;
 
-    -- Pulse center plus its two wrapped neighbours cover every region the pulse
-    -- touches inside [0,1].
-    local Samples = 10; -- points per pulse region -> <= ~33 worst case; safe.
+    local Samples = 10;
     push(0, colorAt(0));
     for _, Origin in next, { Center - 1, Center, Center + 1 } do
         local Lo = Origin - HalfWidth;
         local HiPos = Origin + HalfWidth;
-        -- Intersect [Lo, HiPos] with [0, 1].
         if HiPos > 0 and Lo < 1 then
             local A = math.max(0, Lo);
             local B = math.min(1, HiPos);
