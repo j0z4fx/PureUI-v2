@@ -38,6 +38,12 @@ local Library = {
 
     HudRegistry = {};
 
+    -- Per-gradient shimmer state. A UIGradient is a Roblox Instance, so we can't
+    -- hang arbitrary fields (ShimmerColors etc.) on it -- keep them here instead,
+    -- keyed by the gradient Instance. The per-frame animation loop reads from
+    -- this; AddGradient/SetGradientColor/UpdateColors write to it.
+    ShimmerGradients = {};
+
     FontColor = Color3.fromRGB(245, 238, 238);
     MainColor = Color3.fromRGB(28, 28, 28);
     BackgroundColor = Color3.fromRGB(17, 17, 17);
@@ -460,11 +466,14 @@ function Library:AddGradient(Instance, Color, Rotation, Animated, Shimmer)
 
     if Animated then
         if Shimmer then
-            -- Stash the resolved shimmer colors on the gradient so the per-frame
+            -- Stash the resolved shimmer colors in the registry (NOT on the
+            -- gradient Instance, which rejects unknown members) so the per-frame
             -- loop can rebuild the ColorSequence, and so SetGradientColor can
             -- refresh them when the accent changes.
-            Gradient.ShimmerColors = Library:GetShimmerColors(Color);
-            Gradient.ShimmerRotation = Rotation or 90;
+            Library.ShimmerGradients[Gradient] = {
+                Colors = Library:GetShimmerColors(Color);
+                HalfWidth = 0.09;
+            };
         end;
         Library:AnimateGradient(Gradient, Rotation);
     end;
@@ -481,20 +490,21 @@ function Library:AnimateGradient(Gradient, Rotation)
     -- pure mathematical mod with no discontinuity, and endpoints 0 and 1 are
     -- always base accent so the pulse crosses boundaries without popping.
     --
-    -- Non-shimmer gradients have no ShimmerColors and are left static.
+    -- Non-shimmer gradients have no entry in ShimmerGradients and are left static.
     local StartedAt = os.clock();
     local Speed = 0.45;        -- pulse cycles per second (right -> left)
-    local HalfWidth = 0.09;    -- pulse half-width as a fraction of the line
     local Connection;
 
     Connection = RenderStepped:Connect(function()
         if not Gradient.Parent then
             Connection:Disconnect();
+            Library.ShimmerGradients[Gradient] = nil;
             return;
         end;
 
-        local Colors = Gradient.ShimmerColors;
-        if not Colors then
+        local State = Library.ShimmerGradients[Gradient];
+        if not State then
+            -- Not a shimmer gradient (or cleaned up); leave it static.
             return;
         end;
 
@@ -503,7 +513,7 @@ function Library:AnimateGradient(Gradient, Rotation)
         local Phase = ((os.clock() - StartedAt) * Speed) % 1;
         local Center = 1 - Phase;
 
-        Gradient.Color = Library:BuildShimmerSequence(Colors, Center, HalfWidth);
+        Gradient.Color = Library:BuildShimmerSequence(State.Colors, Center, State.HalfWidth);
         -- No offset shift; the pulse position is encoded in the ColorSequence.
         Gradient.Offset = Vector2.new(0, 0);
     end);
@@ -537,10 +547,13 @@ function Library:SetGradientColor(Instance, Color)
 
     if Gradient then
         if Reg and Reg.GradientShimmer then
-            -- Animated shimmer: refresh the resolved colors the per-frame loop
-            -- reads. The loop will rebuild the ColorSequence itself next frame,
-            -- so we don't write Gradient.Color here.
-            Gradient.ShimmerColors = Library:GetShimmerColors(Color);
+            -- Animated shimmer: refresh the resolved colors in the registry
+            -- (not on the Instance, which rejects unknown members). The per-frame
+            -- loop rebuilds the ColorSequence itself next frame.
+            local State = Library.ShimmerGradients[Gradient];
+            if State then
+                State.Colors = Library:GetShimmerColors(Color);
+            end;
         else
             Gradient.Color = Library:GetGradientSequence(Color);
         end;
@@ -619,9 +632,13 @@ function Library:UpdateColorsUsingRegistry()
         if Object.Gradient then
             local GColor = Object.GradientColor or Object.Properties.BackgroundColor3;
             if Object.GradientShimmer then
-                -- Refresh resolved shimmer colors; the per-frame loop rebuilds
-                -- the ColorSequence itself next frame.
-                Object.Gradient.ShimmerColors = Library:GetShimmerColors(GColor);
+                -- Refresh resolved shimmer colors in the registry (the Instance
+                -- rejects unknown members); the per-frame loop rebuilds the
+                -- ColorSequence itself next frame.
+                local State = Library.ShimmerGradients[Object.Gradient];
+                if State then
+                    State.Colors = Library:GetShimmerColors(GColor);
+                end;
             else
                 Object.Gradient.Color = Library:GetGradientSequence(GColor);
             end;
