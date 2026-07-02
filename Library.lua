@@ -2550,35 +2550,13 @@ do
             Parent = DropdownInner;
         });
 
-        local DropdownPlus = Library:Create('Frame', {
-            BackgroundTransparency = 1;
+        local DropdownPlus = Library:CreateLabel({
             Size = UDim2.new(1, 0, 1, 0);
+            Text = '+';
+            TextSize = 16;
             ZIndex = 9;
             Parent = DropdownIconFrame;
         });
-
-        local DropdownPlusH = Library:Create('Frame', {
-            AnchorPoint = Vector2.new(0.5, 0.5);
-            BackgroundColor3 = Library.FontColor;
-            BorderSizePixel = 0;
-            Position = UDim2.fromScale(0.5, 0.5);
-            Size = UDim2.new(0, 8, 0, 1);
-            ZIndex = 10;
-            Parent = DropdownPlus;
-        });
-
-        local DropdownPlusV = Library:Create('Frame', {
-            AnchorPoint = Vector2.new(0.5, 0.5);
-            BackgroundColor3 = Library.FontColor;
-            BorderSizePixel = 0;
-            Position = UDim2.fromScale(0.5, 0.5);
-            Size = UDim2.new(0, 1, 0, 8);
-            ZIndex = 10;
-            Parent = DropdownPlus;
-        });
-
-        Library:AddToRegistry(DropdownPlusH, { BackgroundColor3 = 'FontColor' });
-        Library:AddToRegistry(DropdownPlusV, { BackgroundColor3 = 'FontColor' });
 
         local DropdownMinus = Library:CreateLabel({
             Size = UDim2.new(1, 0, 1, 0);
@@ -2840,8 +2818,7 @@ do
             ListInner.BackgroundTransparency = 1;
             Library.OpenedFrames[ListOuter] = true;
             Library:Tween(ListInner, 0.12, { BackgroundTransparency = 0 });
-            Library:Tween(DropdownPlusH, 0.1, { BackgroundTransparency = 1 });
-            Library:Tween(DropdownPlusV, 0.1, { BackgroundTransparency = 1 });
+            Library:Tween(DropdownPlus, 0.1, { TextTransparency = 1 });
             Library:Tween(DropdownMinus, 0.1, { TextTransparency = 0 });
         end;
 
@@ -2849,8 +2826,7 @@ do
             Dropdown.Open = false;
             Library.OpenedFrames[ListOuter] = nil;
             Library:Tween(ListInner, 0.1, { BackgroundTransparency = 1 });
-            Library:Tween(DropdownPlusH, 0.1, { BackgroundTransparency = 0 });
-            Library:Tween(DropdownPlusV, 0.1, { BackgroundTransparency = 0 });
+            Library:Tween(DropdownPlus, 0.1, { TextTransparency = 0 });
             Library:Tween(DropdownMinus, 0.1, { TextTransparency = 1 });
 
             task.delay(0.1, function()
