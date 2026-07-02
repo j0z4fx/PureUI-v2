@@ -536,3 +536,28 @@ ThemeManager:ApplyToTab(Tabs['UI Settings'])
 -- You can use the SaveManager:LoadAutoloadConfig() to load a config
 -- which has been marked to be one that auto loads!
 SaveManager:LoadAutoloadConfig()
+
+local function ApplyPreviewLayout()
+    if Window.Holder then
+        Window.Holder.Visible = true
+    end
+
+    if Library.BottomBar then
+        Library.BottomBar.Visible = true
+    end
+
+    Library:SetManagedWindowVisible('Watermark', true)
+    Library:SetManagedWindowVisible('Keybinds', true)
+    Library:SetManagedWindowVisible('TargetInfo', true)
+    Library:SetManagedWindowVisible('PlayerList', true)
+
+    Library.Watermark.Position = UDim2.fromOffset(635, 68)
+    Library.KeybindFrame.AnchorPoint = Vector2.new(0, 0)
+    Library.KeybindFrame.Position = UDim2.fromOffset(610, 108)
+    TargetInfo.Holder.Position = UDim2.fromOffset(610, 165)
+    PlayerList.Holder.Position = UDim2.fromOffset(610, 270)
+end
+
+ApplyPreviewLayout()
+task.delay(1, ApplyPreviewLayout)
+task.delay(5, ApplyPreviewLayout)
