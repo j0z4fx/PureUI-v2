@@ -5,6 +5,7 @@ local Teams = game:GetService('Teams');
 local Players = game:GetService('Players');
 local RunService = game:GetService('RunService')
 local TweenService = game:GetService('TweenService');
+local ContextActionService = game:GetService('ContextActionService');
 local RenderStepped = RunService.RenderStepped;
 local LocalPlayer = Players.LocalPlayer;
 local Mouse = LocalPlayer:GetMouse();
@@ -515,7 +516,6 @@ function Library:CreateCommandModal(Info)
         Callback = Info.Callback or function() end;
     };
     local AcceptedQuery = false;
-    local SuppressHotkeyTextUntil = 0;
 
     local ModalOuter = Library:Create('Frame', {
         AnchorPoint = Vector2.new(0.5, 0.5);
@@ -941,17 +941,56 @@ function Library:CreateCommandModal(Info)
         self:Refresh();
     end;
 
+    local ToggleActionName;
+    if type(Info.ToggleKeys) == 'table' then
+        ToggleActionName = 'PureCommandModalToggle_' .. tostring({}):gsub('table: ', '');
+        ContextActionService:BindActionAtPriority(ToggleActionName, function(_, InputState)
+            if InputState ~= Enum.UserInputState.Begin then
+                return Enum.ContextActionResult.Sink;
+            end;
+
+            local WasVisible = ModalOuter.Visible;
+            local ExpectedText = InputBox.Text;
+            if not WasVisible then
+                ExpectedText = os.clock() > CommandModal.LastTextExpires and '' or CommandModal.LastText;
+            end;
+
+            CommandModal:Toggle();
+
+            local function RefocusAndRestore()
+                if ModalOuter.Visible then
+                    InputBox.Text = ExpectedText;
+                    InputBox:CaptureFocus();
+                    InputBox.CursorPosition = #InputBox.Text + 1;
+                end;
+            end;
+
+            if not WasVisible then
+                task.defer(RefocusAndRestore);
+                task.delay(0.03, RefocusAndRestore);
+                task.delay(0.1, RefocusAndRestore);
+            end;
+
+            return Enum.ContextActionResult.Sink;
+        end, false, 3000, unpack(Info.ToggleKeys));
+
+        Library:GiveSignal({
+            Disconnect = function()
+                ContextActionService:UnbindAction(ToggleActionName);
+            end;
+        });
+    end;
+
     function CommandModal:Destroy()
+        if ToggleActionName then
+            ContextActionService:UnbindAction(ToggleActionName);
+            ToggleActionName = nil;
+        end;
+
         ModalOuter:Destroy();
     end;
 
     InputBox:GetPropertyChangedSignal('Text'):Connect(function()
-        if SuppressHotkeyTextUntil > os.clock() and InputBox.Text:find(';', 1, true) then
-            InputBox.Text = InputBox.Text:gsub('^;', ''):gsub(';$', '');
-            InputBox.CursorPosition = #InputBox.Text + 1;
-            return;
-        end;
-
         CommandModal.SelectedIndex = 1;
         CommandModal:Refresh();
     end);
@@ -962,23 +1001,6 @@ function Library:CreateCommandModal(Info)
         if Input.UserInputType == Enum.UserInputType.Keyboard and Input.KeyCode == Enum.KeyCode.K and CtrlDown then
             CommandModal:Toggle();
             return;
-        end;
-
-        if Input.UserInputType == Enum.UserInputType.Keyboard and type(Info.ToggleKeys) == 'table' then
-            for _, KeyCode in next, Info.ToggleKeys do
-                if Input.KeyCode == KeyCode and not Processed then
-                    SuppressHotkeyTextUntil = os.clock() + 0.35;
-                    CommandModal:Toggle();
-                    task.defer(function()
-                        if ModalOuter.Visible then
-                            InputBox:CaptureFocus();
-                            InputBox.Text = InputBox.Text:gsub('^;', ''):gsub(';$', '');
-                            InputBox.CursorPosition = #InputBox.Text + 1;
-                        end;
-                    end);
-                    return;
-                end;
-            end;
         end;
 
         if not ModalOuter.Visible then
