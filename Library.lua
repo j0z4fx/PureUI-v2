@@ -4189,6 +4189,207 @@ do
         return Dropdown;
     end;
 
+    function Funcs:AddBodySelector(Idx, Info)
+        Info = Info or {};
+
+        local BodySelector = {
+            Value = {};
+            Type = 'BodySelector';
+            Callback = Info.Callback or function(Value) end;
+        };
+
+        local Parts = Info.Parts or {
+            { Key = 'Head', Text = 'Head', Position = UDim2.fromOffset(86, 4), Size = UDim2.fromOffset(48, 34) };
+            { Key = 'Torso', Text = 'Torso', Position = UDim2.fromOffset(79, 43), Size = UDim2.fromOffset(62, 64) };
+            { Key = 'LeftArm', Text = 'L Arm', Position = UDim2.fromOffset(42, 46), Size = UDim2.fromOffset(32, 62) };
+            { Key = 'RightArm', Text = 'R Arm', Position = UDim2.fromOffset(146, 46), Size = UDim2.fromOffset(32, 62) };
+            { Key = 'LeftLeg', Text = 'L Leg', Position = UDim2.fromOffset(80, 112), Size = UDim2.fromOffset(28, 54) };
+            { Key = 'RightLeg', Text = 'R Leg', Position = UDim2.fromOffset(112, 112), Size = UDim2.fromOffset(28, 54) };
+        };
+
+        local Buttons = {};
+        local Groupbox = self;
+        local Container = Groupbox.Container;
+
+        if Info.Text then
+            Library:CreateLabel({
+                Size = UDim2.new(1, 0, 0, 12);
+                TextSize = 14;
+                Text = Info.Text;
+                TextXAlignment = Enum.TextXAlignment.Left;
+                TextYAlignment = Enum.TextYAlignment.Bottom;
+                ZIndex = 5;
+                Parent = Container;
+            });
+
+            Groupbox:AddBlank(3);
+        end;
+
+        local SelectorOuter = Library:Create('Frame', {
+            BackgroundColor3 = Color3.new(0, 0, 0);
+            BorderColor3 = Color3.new(0, 0, 0);
+            Size = UDim2.new(1, -4, 0, Info.Height or 174);
+            ZIndex = 5;
+            Parent = Container;
+        });
+
+        Library:AddToRegistry(SelectorOuter, {
+            BorderColor3 = 'Black';
+        });
+
+        local SelectorInner = Library:Create('Frame', {
+            BackgroundColor3 = Library.ControlColor;
+            BorderColor3 = Library.OutlineColor;
+            BorderMode = Enum.BorderMode.Inset;
+            ClipsDescendants = true;
+            Size = UDim2.new(1, 0, 1, 0);
+            ZIndex = 6;
+            Parent = SelectorOuter;
+        });
+
+        Library:AddToRegistry(SelectorInner, {
+            BackgroundColor3 = 'ControlColor';
+            BorderColor3 = 'OutlineColor';
+        });
+        Library:AddGradient(SelectorInner, 'ControlColor');
+
+        local RigCanvas = Library:Create('Frame', {
+            AnchorPoint = Vector2.new(0.5, 0);
+            BackgroundTransparency = 1;
+            Position = UDim2.new(0.5, 0, 0, 4);
+            Size = UDim2.fromOffset(220, 168);
+            ZIndex = 7;
+            Parent = SelectorInner;
+        });
+
+        local function NormalizeValue(Value)
+            local Normalized = {};
+
+            if type(Value) == 'table' then
+                for Key, Enabled in next, Value do
+                    if type(Key) == 'number' then
+                        Normalized[tostring(Enabled)] = true;
+                    elseif Enabled then
+                        Normalized[tostring(Key)] = true;
+                    end;
+                end;
+            end;
+
+            return Normalized;
+        end;
+
+        function BodySelector:Display()
+            for _, Part in next, Parts do
+                local Button = Buttons[Part.Key];
+                local Selected = self.Value[Part.Key] == true;
+
+                if Button then
+                    Button.Frame.BackgroundColor3 = Selected and Library.AccentColor or Library.BackgroundColor;
+                    Button.Frame.BorderColor3 = Selected and Library.AccentColorDark or Library.OutlineColor;
+                    Button.Label.TextColor3 = Selected and Library.FontColor or Library.FontColor;
+
+                    Library.RegistryMap[Button.Frame].Properties.BackgroundColor3 = Selected and 'AccentColor' or 'BackgroundColor';
+                    Library.RegistryMap[Button.Frame].Properties.BorderColor3 = Selected and 'AccentColorDark' or 'OutlineColor';
+                    Library:SetGradientColor(Button.Frame, Selected and 'AccentColor' or 'BackgroundColor');
+                end;
+            end;
+        end;
+
+        function BodySelector:SetValue(Value)
+            self.Value = NormalizeValue(Value);
+            self:Display();
+
+            Library:SafeCallback(self.Callback, self.Value);
+            Library:SafeCallback(self.Changed, self.Value);
+        end;
+
+        function BodySelector:OnChanged(Func)
+            self.Changed = Func;
+            Func(self.Value);
+        end;
+
+        function BodySelector:GetActiveValues()
+            local Active = {};
+
+            for Key, Enabled in next, self.Value do
+                if Enabled then
+                    table.insert(Active, Key);
+                end;
+            end;
+
+            table.sort(Active);
+            return Active;
+        end;
+
+        local function TogglePart(Key)
+            local NextValue = {};
+            for CurrentKey, Enabled in next, BodySelector.Value do
+                NextValue[CurrentKey] = Enabled;
+            end;
+
+            NextValue[Key] = not NextValue[Key] or nil;
+            BodySelector:SetValue(NextValue);
+            Library:AttemptSave();
+        end;
+
+        for _, Part in next, Parts do
+            local Button = Library:Create('Frame', {
+                Active = true;
+                BackgroundColor3 = Library.BackgroundColor;
+                BorderColor3 = Library.OutlineColor;
+                BorderMode = Enum.BorderMode.Inset;
+                Position = Part.Position;
+                Size = Part.Size;
+                ZIndex = 8;
+                Parent = RigCanvas;
+            });
+
+            Library:AddToRegistry(Button, {
+                BackgroundColor3 = 'BackgroundColor';
+                BorderColor3 = 'OutlineColor';
+            });
+            Library:AddGradient(Button, 'BackgroundColor');
+
+            local Label = Library:CreateLabel({
+                Size = UDim2.new(1, 0, 1, 0);
+                Text = Part.Text;
+                TextSize = 12;
+                TextWrapped = true;
+                ZIndex = 9;
+                Parent = Button;
+            });
+
+            Library:OnHighlight(Button, Button,
+                { BorderColor3 = 'AccentColor' },
+                { BorderColor3 = 'OutlineColor' }
+            );
+
+            Button.InputBegan:Connect(function(Input)
+                if Input.UserInputType == Enum.UserInputType.MouseButton1 and not Library:MouseIsOverOpenedFrame() then
+                    TogglePart(Part.Key);
+                end;
+            end);
+
+            Buttons[Part.Key] = {
+                Frame = Button;
+                Label = Label;
+            };
+        end;
+
+        if type(Info.Tooltip) == 'string' then
+            Library:AddToolTip(Info.Tooltip, SelectorOuter);
+        end;
+
+        BodySelector:SetValue(Info.Default or {});
+
+        Groupbox:AddBlank(Info.BlankSize or 5);
+        Groupbox:Resize();
+
+        Options[Idx] = BodySelector;
+
+        return BodySelector;
+    end;
+
     function Funcs:AddDependencyBox()
         local Depbox = {
             Dependencies = {};
@@ -5689,6 +5890,7 @@ function Library:CreateEspPreview(Info)
     local DesiredVisible = Info.Visible ~= false;
     local Angle = 0;
     local CurrentClone;
+    local IdleTrack;
     local CloneHeight = 5;
 
     local Preview = {
@@ -5800,7 +6002,6 @@ function Library:CreateEspPreview(Info)
     local function StripClone(Clone)
         for _, Descendant in next, Clone:GetDescendants() do
             if Descendant:IsA('BasePart') then
-                Descendant.Anchored = true;
                 Descendant.CanCollide = false;
                 Descendant.CastShadow = false;
             elseif Descendant:IsA('Script') or Descendant:IsA('LocalScript') then
@@ -5809,19 +6010,49 @@ function Library:CreateEspPreview(Info)
         end;
     end;
 
-    function Preview:RefreshAvatar()
-        World:ClearAllChildren();
-        CurrentClone = nil;
-
-        local Character = LocalPlayer.Character;
-        if not Character then
+    local function PlayIdle(Model)
+        local Humanoid = Model and Model:FindFirstChildOfClass('Humanoid');
+        if not Humanoid then
             return;
         end;
 
-        local OldArchivable = Character.Archivable;
-        Character.Archivable = true;
-        local Ok, Clone = pcall(Character.Clone, Character);
-        Character.Archivable = OldArchivable;
+        local Animator = Humanoid:FindFirstChildOfClass('Animator') or Instance.new('Animator');
+        Animator.Parent = Humanoid;
+
+        local Animation = Instance.new('Animation');
+        Animation.AnimationId = Humanoid.RigType == Enum.HumanoidRigType.R6
+            and 'rbxassetid://180435571'
+            or 'rbxassetid://507766666';
+
+        local Ok, Track = pcall(function()
+            return Animator:LoadAnimation(Animation);
+        end);
+
+        Animation:Destroy();
+
+        if Ok and Track then
+            Track.Looped = true;
+            Track.Priority = Enum.AnimationPriority.Idle;
+            Track:Play(0.15, 1, 1);
+            IdleTrack = Track;
+        end;
+    end;
+
+    function Preview:RefreshAvatar()
+        if IdleTrack then
+            pcall(function()
+                IdleTrack:Stop(0);
+                IdleTrack:Destroy();
+            end);
+            IdleTrack = nil;
+        end;
+
+        World:ClearAllChildren();
+        CurrentClone = nil;
+
+        local Ok, Clone = pcall(function()
+            return Players:CreateHumanoidModelFromUserId(LocalPlayer.UserId);
+        end);
 
         if not Ok or not Clone then
             return;
@@ -5829,6 +6060,10 @@ function Library:CreateEspPreview(Info)
 
         StripClone(Clone);
         Clone.Parent = World;
+        pcall(function()
+            Clone:ScaleTo(Info.AvatarScale or 0.9);
+        end);
+        PlayIdle(Clone);
 
         local _, Size = Clone:GetBoundingBox();
         CloneHeight = math.max(Size.Y, 4);
@@ -5836,7 +6071,7 @@ function Library:CreateEspPreview(Info)
 
         Clone:PivotTo(CFrame.new(0, CloneHeight / 2, 0));
         local LookAt = Vector3.new(0, CloneHeight / 2, 0);
-        local Distance = math.max(CloneHeight * 1.35, Size.X * 2.1, 5);
+        local Distance = math.max(CloneHeight * 1.48, Size.X * 2.35, 5.5);
         Camera.CFrame = CFrame.lookAt(Vector3.new(0, CloneHeight * 0.55, Distance), LookAt);
         Camera.FieldOfView = 38;
     end;
@@ -5851,6 +6086,14 @@ function Library:CreateEspPreview(Info)
             pcall(function()
                 Connection:Disconnect();
             end);
+        end;
+
+        if IdleTrack then
+            pcall(function()
+                IdleTrack:Stop(0);
+                IdleTrack:Destroy();
+            end);
+            IdleTrack = nil;
         end;
 
         PreviewOuter:Destroy();

@@ -81,6 +81,22 @@ local EspPreview = Window:AddEspPreview({
 
 The ESP preview is a separate attached panel that follows the main window with a small gap. It uses the Pure UI style and shows a slowly rotating clone of the local player's avatar.
 
+The preview builds a local-player avatar rig, plays an idle animation continuously, and rotates the rig inside the same viewport.
+
+### Body Selector
+
+```lua
+Groupbox:AddBodySelector('BodyParts', {
+    Text = 'Body parts',
+    Default = { Head = true, Torso = true },
+    Callback = function(Value)
+        print(Value.Head, Value.Torso)
+    end,
+})
+```
+
+The body selector is a compact 2D R6 rig where each body part is clickable. Its value is a multi-select table shaped like `{ Head = true, Torso = true }`.
+
 ### Command Modal
 
 ```lua
