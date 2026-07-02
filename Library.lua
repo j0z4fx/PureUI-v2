@@ -30,11 +30,11 @@ local Library = {
     HudRegistry = {};
 
     FontColor = Color3.fromRGB(245, 238, 238);
-    MainColor = Color3.fromRGB(24, 24, 24);
-    BackgroundColor = Color3.fromRGB(16, 16, 16);
-    ControlColor = Color3.fromRGB(31, 31, 31);
+    MainColor = Color3.fromRGB(28, 28, 28);
+    BackgroundColor = Color3.fromRGB(17, 17, 17);
+    ControlColor = Color3.fromRGB(42, 42, 42);
     AccentColor = Color3.fromRGB(216, 114, 150);
-    OutlineColor = Color3.fromRGB(52, 52, 52);
+    OutlineColor = Color3.fromRGB(58, 58, 58);
     RiskColor = Color3.fromRGB(255, 50, 50),
 
     Black = Color3.new(0, 0, 0);
@@ -333,12 +333,10 @@ function Library:ResolveColor(Color)
 end;
 
 function Library:GetGradientSequence(Color)
-    Color = Library:ResolveColor(Color) or Color3.new(1, 1, 1);
-
     return ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Library:GetLighterColor(Color)),
-        ColorSequenceKeypoint.new(0.68, Color),
-        ColorSequenceKeypoint.new(1, Library:GetDarkerColor(Color)),
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+        ColorSequenceKeypoint.new(0.72, Color3.fromRGB(246, 246, 246)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(218, 218, 218)),
     });
 end;
 
@@ -3095,7 +3093,7 @@ function Library:CreateWindow(...)
         local TabButtonWidth = Library:GetTextBounds(Name, Library.Font, 16);
 
         local TabButton = Library:Create('Frame', {
-            BackgroundColor3 = Library.BackgroundColor;
+            BackgroundColor3 = Library.MainColor;
             BorderColor3 = Library.OutlineColor;
             Size = UDim2.new(0, TabButtonWidth + 8 + 4, 1, 0);
             ZIndex = 1;
@@ -3103,10 +3101,10 @@ function Library:CreateWindow(...)
         });
 
         Library:AddToRegistry(TabButton, {
-            BackgroundColor3 = 'ControlColor';
+            BackgroundColor3 = 'MainColor';
             BorderColor3 = 'OutlineColor';
         });
-        Library:AddGradient(TabButton, 'ControlColor');
+        Library:AddGradient(TabButton, 'MainColor');
 
         local TabButtonLabel = Library:CreateLabel({
             Position = UDim2.new(0, 0, 0, 0);
@@ -3194,17 +3192,17 @@ function Library:CreateWindow(...)
             end;
 
             Blocker.BackgroundTransparency = 0;
-            TabButton.BackgroundColor3 = Library.MainColor;
-            Library.RegistryMap[TabButton].Properties.BackgroundColor3 = 'MainColor';
-            Library:SetGradientColor(TabButton, 'MainColor');
+            TabButton.BackgroundColor3 = Library.ControlColor;
+            Library.RegistryMap[TabButton].Properties.BackgroundColor3 = 'ControlColor';
+            Library:SetGradientColor(TabButton, 'ControlColor');
             TabFrame.Visible = true;
         end;
 
         function Tab:HideTab()
             Blocker.BackgroundTransparency = 1;
-            TabButton.BackgroundColor3 = Library.ControlColor;
-            Library.RegistryMap[TabButton].Properties.BackgroundColor3 = 'ControlColor';
-            Library:SetGradientColor(TabButton, 'ControlColor');
+            TabButton.BackgroundColor3 = Library.MainColor;
+            Library.RegistryMap[TabButton].Properties.BackgroundColor3 = 'MainColor';
+            Library:SetGradientColor(TabButton, 'MainColor');
             TabFrame.Visible = false;
         end;
 
@@ -3377,7 +3375,7 @@ function Library:CreateWindow(...)
                 local Tab = {};
 
                 local Button = Library:Create('Frame', {
-                    BackgroundColor3 = Library.ControlColor;
+                    BackgroundColor3 = Library.MainColor;
                     BorderColor3 = Color3.new(0, 0, 0);
                     Size = UDim2.new(0.5, 0, 1, 0);
                     ZIndex = 6;
@@ -3385,9 +3383,9 @@ function Library:CreateWindow(...)
                 });
 
                 Library:AddToRegistry(Button, {
-                    BackgroundColor3 = 'ControlColor';
+                    BackgroundColor3 = 'MainColor';
                 });
-                Library:AddGradient(Button, 'ControlColor');
+                Library:AddGradient(Button, 'MainColor');
 
                 local ButtonLabel = Library:CreateLabel({
                     Size = UDim2.new(1, 0, 1, 0);
@@ -3435,9 +3433,9 @@ function Library:CreateWindow(...)
                     Container.Visible = true;
                     Block.Visible = true;
 
-                    Button.BackgroundColor3 = Library.BackgroundColor;
-                    Library.RegistryMap[Button].Properties.BackgroundColor3 = 'BackgroundColor';
-                    Library:SetGradientColor(Button, 'BackgroundColor');
+                    Button.BackgroundColor3 = Library.ControlColor;
+                    Library.RegistryMap[Button].Properties.BackgroundColor3 = 'ControlColor';
+                    Library:SetGradientColor(Button, 'ControlColor');
 
                     Tab:Resize();
                 end;
@@ -3446,9 +3444,9 @@ function Library:CreateWindow(...)
                     Container.Visible = false;
                     Block.Visible = false;
 
-                    Button.BackgroundColor3 = Library.ControlColor;
-                    Library.RegistryMap[Button].Properties.BackgroundColor3 = 'ControlColor';
-                    Library:SetGradientColor(Button, 'ControlColor');
+                    Button.BackgroundColor3 = Library.MainColor;
+                    Library.RegistryMap[Button].Properties.BackgroundColor3 = 'MainColor';
+                    Library:SetGradientColor(Button, 'MainColor');
                 end;
 
                 function Tab:Resize()
