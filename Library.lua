@@ -495,13 +495,17 @@ function Library:CreateCommandModal(Info)
         Items = {};
         Filtered = {};
         SelectedIndex = 1;
+        ScrollIndex = 1;
+        LastText = '';
+        LastTextExpires = 0;
+        LastTextToken = 0;
         Callback = Info.Callback or function() end;
     };
 
     local ModalOuter = Library:Create('Frame', {
         AnchorPoint = Vector2.new(0.5, 0.5);
         BorderColor3 = Color3.new(0, 0, 0);
-        Position = Info.Position or UDim2.new(0.5, 0, 0.42, 0);
+        Position = Info.Position or UDim2.new(0.5, 0, 0.48, 0);
         Size = Info.Size or UDim2.fromOffset(380, 252);
         Visible = false;
         ZIndex = 240;
@@ -668,7 +672,7 @@ function Library:CreateCommandModal(Info)
 
         RowOuter.InputBegan:Connect(function(Input)
             if Input.UserInputType == Enum.UserInputType.MouseButton1 then
-                CommandModal.SelectedIndex = Index;
+                CommandModal.SelectedIndex = CommandModal.ScrollIndex + Index - 1;
                 CommandModal:Accept();
             end;
         end);
@@ -708,6 +712,12 @@ function Library:CreateCommandModal(Info)
             self.SelectedIndex = ((Index - 1) % #self.Filtered) + 1;
         end;
 
+        if self.SelectedIndex < self.ScrollIndex then
+            self.ScrollIndex = self.SelectedIndex;
+        elseif self.SelectedIndex >= self.ScrollIndex + MaxRows then
+            self.ScrollIndex = self.SelectedIndex - MaxRows + 1;
+        end;
+
         self:RefreshRows();
     end;
 
@@ -729,14 +739,21 @@ function Library:CreateCommandModal(Info)
             self.SelectedIndex = 1;
         end;
 
+        if #self.Filtered == 0 then
+            self.ScrollIndex = 1;
+        elseif self.ScrollIndex > #self.Filtered then
+            self.ScrollIndex = math.max(1, #self.Filtered - MaxRows + 1);
+        end;
+
         self:RefreshRows();
         self:RefreshGhost();
     end;
 
     function CommandModal:RefreshRows()
         for Index, Row in next, ResultRows do
-            local Item = self.Filtered[Index];
-            local Selected = Index == self.SelectedIndex;
+            local ItemIndex = self.ScrollIndex + Index - 1;
+            local Item = self.Filtered[ItemIndex];
+            local Selected = ItemIndex == self.SelectedIndex;
             Row.Outer.Visible = Item ~= nil;
 
             if Item then
@@ -775,6 +792,7 @@ function Library:CreateCommandModal(Info)
             InputBox.Text = Top.Text;
             InputBox.CursorPosition = #InputBox.Text + 1;
             self.SelectedIndex = 1;
+            self.ScrollIndex = 1;
             self:Refresh();
         end;
     end;
@@ -793,9 +811,33 @@ function Library:CreateCommandModal(Info)
         ModalOuter.Visible = Visible;
 
         if Visible then
+            if os.clock() > self.LastTextExpires then
+                self.LastText = '';
+            end;
+
+            InputBox.Text = self.LastText;
+            InputBox.CursorPosition = #InputBox.Text + 1;
+            self.SelectedIndex = 1;
+            self.ScrollIndex = 1;
             InputBox:CaptureFocus();
             self:Refresh();
         else
+            self.LastText = InputBox.Text or '';
+            self.LastTextExpires = os.clock() + 20;
+            self.LastTextToken = self.LastTextToken + 1;
+            local Token = self.LastTextToken;
+
+            task.delay(20, function()
+                if self.LastTextToken == Token and os.clock() >= self.LastTextExpires then
+                    self.LastText = '';
+                    self.LastTextExpires = 0;
+
+                    if not ModalOuter.Visible then
+                        InputBox.Text = '';
+                    end;
+                end;
+            end);
+
             InputBox:ReleaseFocus();
         end;
     end;
@@ -4190,6 +4232,7 @@ function Library:CreatePlayerList(Info)
     local PlayerList = {
         Rows = {};
         Actions = {};
+        Filter = '';
         SelectedPlayer = nil;
     };
 
@@ -4245,8 +4288,8 @@ function Library:CreatePlayerList(Info)
         BackgroundColor3 = Library.BackgroundColor;
         BorderColor3 = Library.OutlineColor;
         BorderMode = Enum.BorderMode.Inset;
-        Position = UDim2.new(0, 8, 0, 28);
-        Size = UDim2.new(1, -16, 0.66, -34);
+        Position = UDim2.new(0, 8, 0, 58);
+        Size = UDim2.new(1, -16, 0.66, -64);
         ZIndex = 82;
         Parent = ListInner;
     });
@@ -4283,6 +4326,54 @@ function Library:CreatePlayerList(Info)
         PlayersScroll.CanvasSize = UDim2.fromOffset(0, PlayersLayout.AbsoluteContentSize.Y + 2);
     end);
 
+    local SearchOuter = Library:Create('Frame', {
+        BackgroundColor3 = Color3.new(0, 0, 0);
+        BorderColor3 = Color3.new(0, 0, 0);
+        Position = UDim2.new(0, 8, 0, 29);
+        Size = UDim2.new(1, -16, 0, 24);
+        ZIndex = 82;
+        Parent = ListInner;
+    });
+
+    Library:AddToRegistry(SearchOuter, {
+        BorderColor3 = 'Black';
+    }, true);
+
+    local SearchInner = Library:Create('Frame', {
+        BackgroundColor3 = Library.ControlColor;
+        BorderColor3 = Library.OutlineColor;
+        BorderMode = Enum.BorderMode.Inset;
+        Size = UDim2.new(1, 0, 1, 0);
+        ZIndex = 83;
+        Parent = SearchOuter;
+    });
+
+    Library:AddToRegistry(SearchInner, {
+        BackgroundColor3 = 'ControlColor';
+        BorderColor3 = 'OutlineColor';
+    }, true);
+    Library:AddGradient(SearchInner, 'ControlColor');
+
+    local SearchBox = Library:Create('TextBox', {
+        BackgroundTransparency = 1;
+        ClearTextOnFocus = false;
+        Font = Library.Font;
+        PlaceholderText = 'Search players...';
+        Position = UDim2.new(0, 7, 0, 0);
+        Size = UDim2.new(1, -14, 1, 0);
+        Text = '';
+        TextColor3 = Library.FontColor;
+        TextSize = 13;
+        TextStrokeTransparency = 1;
+        TextXAlignment = Enum.TextXAlignment.Left;
+        ZIndex = 84;
+        Parent = SearchInner;
+    });
+
+    Library:AddToRegistry(SearchBox, {
+        TextColor3 = 'FontColor';
+    }, true);
+
     local ActionsOuter = Library:Create('Frame', {
         BackgroundColor3 = Library.BackgroundColor;
         BorderColor3 = Library.OutlineColor;
@@ -4298,13 +4389,21 @@ function Library:CreatePlayerList(Info)
         BorderColor3 = 'OutlineColor';
     }, true);
 
-    local ActionsContainer = Library:Create('Frame', {
+    local ActionsContainer = Library:Create('ScrollingFrame', {
         BackgroundTransparency = 1;
+        BorderSizePixel = 0;
+        CanvasSize = UDim2.new(0, 0, 0, 0);
         Position = UDim2.new(0, 4, 0, 22);
         Size = UDim2.new(1, -8, 1, -26);
+        ScrollBarImageColor3 = Library.AccentColor;
+        ScrollBarThickness = 3;
         ZIndex = 83;
         Parent = ActionsOuter;
     });
+
+    Library:AddToRegistry(ActionsContainer, {
+        ScrollBarImageColor3 = 'AccentColor';
+    }, true);
 
     Library:CreateLabel({
         Position = UDim2.new(0, 4, 0, 2);
@@ -4316,12 +4415,16 @@ function Library:CreatePlayerList(Info)
         Parent = ActionsOuter;
     }, true);
 
-    Library:Create('UIListLayout', {
+    local ActionsLayout = Library:Create('UIListLayout', {
         FillDirection = Enum.FillDirection.Vertical;
         Padding = UDim.new(0, 4);
         SortOrder = Enum.SortOrder.LayoutOrder;
         Parent = ActionsContainer;
     });
+
+    ActionsLayout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
+        ActionsContainer.CanvasSize = UDim2.fromOffset(0, ActionsLayout.AbsoluteContentSize.Y + 2);
+    end);
 
     function PlayerList:GetSelectedPlayer()
         return self.SelectedPlayer;
@@ -4329,6 +4432,14 @@ function Library:CreatePlayerList(Info)
 
     function PlayerList:SetVisible(Visible)
         ListOuter.Visible = Visible;
+
+        if not Visible then
+            for _, Action in next, self.Actions do
+                if type(Action) == 'table' and Action.Close then
+                    Action:Close();
+                end;
+            end;
+        end;
     end;
 
     function PlayerList:Destroy()
@@ -4336,6 +4447,10 @@ function Library:CreatePlayerList(Info)
             if typeof(Action) == 'RBXScriptConnection' then
                 pcall(function()
                     Action:Disconnect();
+                end);
+            elseif type(Action) == 'table' and Action.Destroy then
+                pcall(function()
+                    Action:Destroy();
                 end);
             end;
         end;
@@ -4446,21 +4561,46 @@ function Library:CreatePlayerList(Info)
         local Current = self.SelectedPlayer;
         self:ClearRows();
 
+        local Query = (self.Filter or ''):lower();
+        local UsernameOnly = Query:sub(1, 1) == '@';
+        if UsernameOnly then
+            Query = Query:sub(2);
+        end;
+
         local CurrentPlayers = Players:GetPlayers();
+        local FirstMatching;
         table.sort(CurrentPlayers, function(A, B)
+            if A == LocalPlayer then
+                return true;
+            elseif B == LocalPlayer then
+                return false;
+            end;
+
             return A.Name:lower() < B.Name:lower();
         end);
 
         for _, Player in next, CurrentPlayers do
-            self:AddPlayerRow(Player);
+            local Name = Player.Name:lower();
+            local DisplayName = Player.DisplayName:lower();
+            local Matches = Query == '' or Name:find(Query, 1, true) or ((not UsernameOnly) and DisplayName:find(Query, 1, true));
+
+            if Matches then
+                FirstMatching = FirstMatching or Player;
+                self:AddPlayerRow(Player);
+            end;
         end;
 
-        if Current and Players:FindFirstChild(Current.Name) then
+        if Current and self.Rows[Current] then
             self:SetSelectedPlayer(Current);
         else
-            self:SetSelectedPlayer(CurrentPlayers[1]);
+            self:SetSelectedPlayer(FirstMatching);
         end;
     end;
+
+    SearchBox:GetPropertyChangedSignal('Text'):Connect(function()
+        PlayerList.Filter = SearchBox.Text or '';
+        PlayerList:Refresh();
+    end);
 
     local function ProcessActionParams(Obj, ...)
         local Props = select(1, ...);
@@ -4614,9 +4754,213 @@ function Library:CreatePlayerList(Info)
         return Toggle;
     end;
 
+    function PlayerList:AddDropdown(Idx, Info)
+        Info = Info or {};
+        assert(Info.Values, 'PlayerList:AddDropdown: missing Values.');
+
+        local Dropdown = {
+            Value = nil;
+            Values = Info.Values;
+            Callback = Info.Callback or function() end;
+            Open = false;
+        };
+
+        local DropdownOuter = Library:Create('Frame', {
+            Active = true;
+            BackgroundColor3 = Color3.new(0, 0, 0);
+            BorderColor3 = Color3.new(0, 0, 0);
+            Size = UDim2.new(1, 0, 0, 22);
+            ZIndex = 84;
+            Parent = ActionsContainer;
+        });
+
+        Library:AddToRegistry(DropdownOuter, {
+            BorderColor3 = 'Black';
+        }, true);
+
+        local DropdownInner = Library:Create('Frame', {
+            BackgroundColor3 = Library.ControlColor;
+            BorderColor3 = Library.OutlineColor;
+            BorderMode = Enum.BorderMode.Inset;
+            Size = UDim2.new(1, 0, 1, 0);
+            ZIndex = 85;
+            Parent = DropdownOuter;
+        });
+
+        Library:AddToRegistry(DropdownInner, {
+            BackgroundColor3 = 'ControlColor';
+            BorderColor3 = 'OutlineColor';
+        }, true);
+        Library:AddGradient(DropdownInner, 'ControlColor');
+
+        local ValueLabel = Library:CreateLabel({
+            Position = UDim2.new(0, 7, 0, 0);
+            Size = UDim2.new(1, -26, 1, 0);
+            Text = '';
+            TextSize = 13;
+            TextXAlignment = Enum.TextXAlignment.Left;
+            ZIndex = 86;
+            Parent = DropdownInner;
+        }, true);
+
+        local Plus = Library:Create('TextLabel', {
+            BackgroundTransparency = 1;
+            Font = Library.Font;
+            Position = UDim2.new(1, -20, 0, 0);
+            Size = UDim2.new(0, 18, 1, 0);
+            Text = '+';
+            TextColor3 = Library.FontColor;
+            TextSize = 14;
+            TextStrokeTransparency = 1;
+            ZIndex = 86;
+            Parent = DropdownInner;
+        });
+
+        Library:AddToRegistry(Plus, {
+            TextColor3 = 'FontColor';
+        }, true);
+
+        local ListOuter = Library:Create('Frame', {
+            BackgroundColor3 = Color3.new(0, 0, 0);
+            BorderColor3 = Color3.new(0, 0, 0);
+            Size = UDim2.fromOffset(0, 0);
+            Visible = false;
+            ZIndex = 230;
+            Parent = ScreenGui;
+        });
+
+        Library:AddToRegistry(ListOuter, {
+            BorderColor3 = 'Black';
+        }, true);
+
+        local ListInner = Library:Create('Frame', {
+            BackgroundColor3 = Library.ControlColor;
+            BorderColor3 = Library.OutlineColor;
+            BorderMode = Enum.BorderMode.Inset;
+            Size = UDim2.new(1, 0, 1, 0);
+            ZIndex = 231;
+            Parent = ListOuter;
+        });
+
+        Library:AddToRegistry(ListInner, {
+            BackgroundColor3 = 'ControlColor';
+            BorderColor3 = 'OutlineColor';
+        }, true);
+        Library:AddGradient(ListInner, 'ControlColor');
+
+        Library:Create('UIListLayout', {
+            FillDirection = Enum.FillDirection.Vertical;
+            Padding = UDim.new(0, 0);
+            SortOrder = Enum.SortOrder.LayoutOrder;
+            Parent = ListInner;
+        });
+
+        local function RepositionList()
+            ListOuter.Position = UDim2.fromOffset(DropdownOuter.AbsolutePosition.X, DropdownOuter.AbsolutePosition.Y + DropdownOuter.AbsoluteSize.Y + 2);
+            ListOuter.Size = UDim2.fromOffset(DropdownOuter.AbsoluteSize.X, #Dropdown.Values * 20 + 2);
+        end;
+
+        local function Close()
+            Dropdown.Open = false;
+            ListOuter.Visible = false;
+            Plus.Text = '+';
+            Library.OpenedFrames[ListOuter] = nil;
+        end;
+
+        local function Open()
+            Dropdown.Open = true;
+            RepositionList();
+            ListOuter.Visible = true;
+            Plus.Text = '-';
+            Library.OpenedFrames[ListOuter] = true;
+        end;
+
+        function Dropdown:SetValue(Value)
+            self.Value = Value;
+            ValueLabel.Text = tostring(Value or '--');
+            Library:SafeCallback(self.Callback, self.Value, PlayerList.SelectedPlayer, PlayerList);
+        end;
+
+        function Dropdown:Close()
+            Close();
+        end;
+
+        function Dropdown:Destroy()
+            Close();
+            ListOuter:Destroy();
+        end;
+
+        function Dropdown:OnChanged(Callback)
+            self.Callback = Callback;
+            Callback(self.Value, PlayerList.SelectedPlayer, PlayerList);
+        end;
+
+        for _, Value in next, Dropdown.Values do
+            local Button = Library:Create('Frame', {
+                Active = true;
+                BackgroundColor3 = Library.ControlColor;
+                BorderColor3 = Library.OutlineColor;
+                BorderMode = Enum.BorderMode.Middle;
+                Size = UDim2.new(1, -1, 0, 20);
+                ZIndex = 232;
+                Parent = ListInner;
+            });
+
+            Library:AddToRegistry(Button, {
+                BackgroundColor3 = 'ControlColor';
+                BorderColor3 = 'OutlineColor';
+            }, true);
+            Library:AddGradient(Button, 'ControlColor');
+
+            Library:CreateLabel({
+                Position = UDim2.new(0, 6, 0, 0);
+                Size = UDim2.new(1, -12, 1, 0);
+                Text = tostring(Value);
+                TextSize = 13;
+                TextXAlignment = Enum.TextXAlignment.Left;
+                ZIndex = 233;
+                Parent = Button;
+            }, true);
+
+            Button.InputBegan:Connect(function(Input)
+                if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    Dropdown:SetValue(Value);
+                    Close();
+                end;
+            end);
+        end;
+
+        DropdownOuter.InputBegan:Connect(function(Input)
+            if Input.UserInputType == Enum.UserInputType.MouseButton1 and not Library:MouseIsOverOpenedFrame() then
+                if Dropdown.Open then
+                    Close();
+                else
+                    Open();
+                end;
+            end;
+        end);
+
+        DropdownOuter:GetPropertyChangedSignal('AbsolutePosition'):Connect(function()
+            if Dropdown.Open then
+                RepositionList();
+            end;
+        end);
+
+        DropdownOuter:GetPropertyChangedSignal('AbsoluteSize'):Connect(function()
+            if Dropdown.Open then
+                RepositionList();
+            end;
+        end);
+
+        Dropdown:SetValue(Info.Default or Dropdown.Values[1]);
+        self.Actions[Idx] = Dropdown;
+        return Dropdown;
+    end;
+
     Library:MakeDraggable(ListOuter, 24);
     PlayerList.Holder = ListOuter;
     PlayerList.Container = ActionsContainer;
+    PlayerList.SearchBox = SearchBox;
     Library:RegisterManagedWindow('PlayerList', PlayerList, Info.Visible ~= false);
 
     PlayerList:Refresh();

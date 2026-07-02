@@ -52,9 +52,17 @@ PlayerList:AddToggle('SpectatePlayer', {
         print('Spectate:', Value, Player and Player.Name)
     end,
 })
+
+PlayerList:AddDropdown('Disposition', {
+    Values = { 'Whitelist', 'Enemy', 'Sentry', 'Sentry (Passive)' },
+    Default = 'Whitelist',
+    Callback = function(Value, Player)
+        print('Disposition:', Value, Player and Player.Name)
+    end,
+})
 ```
 
-The player list window is separate from the main menu. The top section shows players with profile pictures, and the bottom third is reserved for compact action controls. Action callbacks receive the selected player.
+The player list window is separate from the main menu. The top section shows players with profile pictures, keeps the local player pinned to the top, and includes search by display name or username. Prefix the search with `@` to search usernames only. The bottom third is reserved for compact action controls. Action callbacks receive the selected player.
 
 ### Command Modal
 
@@ -69,7 +77,7 @@ local CommandModal = Library:CreateCommandModal({
 })
 ```
 
-Press `Ctrl+K` to open the command modal. Type to filter suggestions, use the arrow keys to move selection, press `Enter` to select, and press `Tab` to autocomplete the top result.
+Press `Ctrl+K` to open the command modal. Type to filter suggestions, use the arrow keys to move selection, press `Enter` to select, and press `Tab` to autocomplete the top result. Arrow navigation auto-scrolls the suggestion list, and a half-typed command is restored for 20 seconds after closing the modal.
 
 ## Interface Preview
 <img src="https://i.imgur.com/qs0Hqc6.png" />
