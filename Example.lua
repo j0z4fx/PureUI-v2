@@ -1,7 +1,7 @@
 -- New example script written by wally
 -- You can suggest changes with a pull request or something
 
-local repo = 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/8943954/'
+local repo = 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/849d63d/'
 local cacheBust = '?v=' .. tostring(os.time())
 
 local Library = loadstring(game:HttpGet(repo .. 'Library.lua' .. cacheBust))()
@@ -9,39 +9,31 @@ local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua' .
 local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua' .. cacheBust))()
 local Players = game:GetService('Players')
 
-local CommandModal = Library:CreateCommandModal({
-    Title = 'Fruits',
-    Placeholder = 'Search fruits...',
-    Items = {
-        'Apple',
-        'Apricot',
-        'Banana',
-        'Blackberry',
-        'Blueberry',
-        'Cherry',
-        'Grape',
-        'Kiwi',
-        'Lemon',
-        'Mango',
-        'Orange',
-        'Peach',
-        'Pear',
-        'Pineapple',
-        'Strawberry',
-        'Watermelon',
-    },
-    Callback = function(Value)
-        Library:Notify('Selected fruit: ' .. tostring(Value), 2)
-    end,
+local PreviewBackdrop = Instance.new('Frame')
+PreviewBackdrop.Name = 'PureUIPreviewBackdrop'
+PreviewBackdrop.BackgroundColor3 = Color3.fromRGB(132, 132, 132)
+PreviewBackdrop.BorderSizePixel = 0
+PreviewBackdrop.Size = UDim2.fromScale(1, 1)
+PreviewBackdrop.ZIndex = 0
+PreviewBackdrop.Parent = Library.ScreenGui
+
+local CommandModal = Library:CreateInfiniteYieldCommandModal({
+    Title = 'Infinite Yield',
+    Placeholder = 'Run command...',
+    Position = UDim2.fromOffset(635, 395),
 })
 
 local TargetInfo = Library:CreateTargetInfo({
     Player = Players.LocalPlayer,
+    Position = UDim2.fromOffset(610, 165),
     -- shieldBar = false,
 })
 
 local PlayerList = Library:CreatePlayerList({
     Title = 'Players',
+    AnchorPoint = Vector2.new(0, 0),
+    Position = UDim2.fromOffset(610, 270),
+    Size = UDim2.fromOffset(300, 360),
 })
 
 PlayerList:AddButton({
@@ -98,7 +90,9 @@ local Window = Library:CreateWindow({
     -- but you do not need to define them unless you are changing them :)
 
     Title = 'Example menu',
-    Center = true,
+    Center = false,
+    Position = UDim2.fromOffset(34, 34),
+    Size = UDim2.fromOffset(548, 598),
     AutoShow = true,
     TabPadding = 8,
     MenuFadeTime = 0.2
@@ -467,6 +461,7 @@ SubDepbox:SetupDependencies({
 -- Library functions
 -- Sets the watermark visibility
 Library:SetWatermarkVisibility(true)
+Library.Watermark.Position = UDim2.fromOffset(635, 68)
 
 -- Example of dynamically-updating watermark with common traits (fps and ping)
 local FrameTimer = tick()
@@ -489,9 +484,12 @@ local WatermarkConnection = game:GetService('RunService').RenderStepped:Connect(
 end);
 
 Library:SetManagedWindowVisible('Keybinds', true)
+Library.KeybindFrame.AnchorPoint = Vector2.new(0, 0)
+Library.KeybindFrame.Position = UDim2.fromOffset(610, 108)
 
 Library:OnUnload(function()
     WatermarkConnection:Disconnect()
+    PreviewBackdrop:Destroy()
 
     print('Unloaded!')
     Library.Unloaded = true
