@@ -533,10 +533,6 @@ SaveManager:BuildConfigSection(Tabs['UI Settings'])
 -- NOTE: you can also call ThemeManager:ApplyToGroupbox to add it to a specific groupbox
 ThemeManager:ApplyToTab(Tabs['UI Settings'])
 
--- You can use the SaveManager:LoadAutoloadConfig() to load a config
--- which has been marked to be one that auto loads!
-SaveManager:LoadAutoloadConfig()
-
 local function ApplyPreviewLayout()
     if Window.Holder then
         Window.Holder.Visible = true
@@ -559,5 +555,13 @@ local function ApplyPreviewLayout()
 end
 
 ApplyPreviewLayout()
-task.delay(1, ApplyPreviewLayout)
-task.delay(5, ApplyPreviewLayout)
+task.spawn(function()
+    for _, Delay in next, { 0.25, 1, 3, 5 } do
+        task.wait(Delay)
+        ApplyPreviewLayout()
+    end
+end)
+
+-- You can use the SaveManager:LoadAutoloadConfig() to load a config
+-- which has been marked to be one that auto loads!
+SaveManager:LoadAutoloadConfig()
