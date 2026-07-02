@@ -52,6 +52,7 @@ local Library = {
 
     OpenedFrames = {};
     DependencyBoxes = {};
+    ManagedWindows = {};
 
     Signals = {};
     ScreenGui = ScreenGui;
@@ -315,6 +316,176 @@ function Library:MakeResizable(Instance, DefaultSize)
             end;
         end);
     end;
+end;
+
+function Library:RegisterManagedWindow(Name, Object, Visible)
+    if not Name or not Object then
+        return;
+    end;
+
+    Library.ManagedWindows[Name] = {
+        Object = Object;
+        Visible = Visible ~= false;
+    };
+end;
+
+function Library:SetManagedWindowVisible(Name, Visible)
+    local Window = Library.ManagedWindows[Name];
+    if not Window then
+        return;
+    end;
+
+    Window.Visible = Visible == true;
+
+    if type(Window.Object) == 'table' and type(Window.Object.SetVisible) == 'function' then
+        Window.Object:SetVisible(Window.Visible);
+    elseif typeof(Window.Object) == 'Instance' then
+        Window.Object.Visible = Window.Visible;
+    end;
+end;
+
+function Library:ToggleManagedWindow(Name)
+    local Window = Library.ManagedWindows[Name];
+    if Window then
+        Library:SetManagedWindowVisible(Name, not Window.Visible);
+    end;
+end;
+
+function Library:SetManagedWindowsOpen(MenuOpen)
+    for Name, Window in next, Library.ManagedWindows do
+        local ShouldShow = MenuOpen and Window.Visible;
+
+        if type(Window.Object) == 'table' and type(Window.Object.SetVisible) == 'function' then
+            Window.Object:SetVisible(ShouldShow);
+        elseif typeof(Window.Object) == 'Instance' then
+            Window.Object.Visible = ShouldShow;
+        end;
+    end;
+end;
+
+function Library:CreateBottomBar()
+    if Library.BottomBar then
+        return Library.BottomBar;
+    end;
+
+    local BarOuter = Library:Create('Frame', {
+        AnchorPoint = Vector2.new(0.5, 1);
+        BorderColor3 = Color3.new(0, 0, 0);
+        Position = UDim2.new(0.5, 0, 1, -12);
+        Size = UDim2.new(0, 500, 0, 28);
+        Visible = false;
+        ZIndex = 220;
+        Parent = ScreenGui;
+    });
+
+    local BarInner = Library:Create('Frame', {
+        BackgroundColor3 = Library.MainColor;
+        BorderColor3 = Library.OutlineColor;
+        BorderMode = Enum.BorderMode.Inset;
+        Size = UDim2.new(1, 0, 1, 0);
+        ZIndex = 221;
+        Parent = BarOuter;
+    });
+
+    Library:AddToRegistry(BarInner, {
+        BackgroundColor3 = 'MainColor';
+        BorderColor3 = 'OutlineColor';
+    }, true);
+    Library:AddGradient(BarInner, 'MainColor');
+
+    local ButtonHolder = Library:Create('Frame', {
+        BackgroundTransparency = 1;
+        Position = UDim2.new(0, 4, 0, 4);
+        Size = UDim2.new(1, -8, 1, -8);
+        ZIndex = 222;
+        Parent = BarInner;
+    });
+
+    Library:Create('UIListLayout', {
+        FillDirection = Enum.FillDirection.Horizontal;
+        Padding = UDim.new(0, 4);
+        SortOrder = Enum.SortOrder.LayoutOrder;
+        Parent = ButtonHolder;
+    });
+
+    local Buttons = {};
+
+    local function AddBarButton(Text, Callback)
+        local ButtonOuter = Library:Create('Frame', {
+            Active = true;
+            BackgroundColor3 = Color3.new(0, 0, 0);
+            BorderColor3 = Color3.new(0, 0, 0);
+            Size = UDim2.new(0.2, -4, 1, 0);
+            ZIndex = 223;
+            Parent = ButtonHolder;
+        });
+
+        Library:AddToRegistry(ButtonOuter, {
+            BorderColor3 = 'Black';
+        }, true);
+
+        local ButtonInner = Library:Create('Frame', {
+            BackgroundColor3 = Library.ControlColor;
+            BorderColor3 = Library.OutlineColor;
+            BorderMode = Enum.BorderMode.Inset;
+            Size = UDim2.new(1, 0, 1, 0);
+            ZIndex = 224;
+            Parent = ButtonOuter;
+        });
+
+        Library:AddToRegistry(ButtonInner, {
+            BackgroundColor3 = 'ControlColor';
+            BorderColor3 = 'OutlineColor';
+        }, true);
+        Library:AddGradient(ButtonInner, 'ControlColor');
+
+        Library:CreateLabel({
+            Size = UDim2.new(1, 0, 1, 0);
+            Text = Text;
+            TextSize = 13;
+            ZIndex = 225;
+            Parent = ButtonInner;
+        }, true);
+
+        ButtonOuter.MouseEnter:Connect(function()
+            Library:Tween(ButtonInner, 0.1, { BackgroundColor3 = Library:GetLighterColor(Library.ControlColor) });
+        end);
+
+        ButtonOuter.MouseLeave:Connect(function()
+            Library:Tween(ButtonInner, 0.12, { BackgroundColor3 = Library.ControlColor });
+        end);
+
+        ButtonOuter.InputBegan:Connect(function(Input)
+            if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+                Callback();
+            end;
+        end);
+
+        table.insert(Buttons, ButtonOuter);
+    end;
+
+    AddBarButton('Keybinds', function()
+        Library:ToggleManagedWindow('Keybinds');
+    end);
+
+    AddBarButton('Menu', function()
+        task.spawn(Library.Toggle);
+    end);
+
+    AddBarButton('Players', function()
+        Library:ToggleManagedWindow('PlayerList');
+    end);
+
+    AddBarButton('Target', function()
+        Library:ToggleManagedWindow('TargetInfo');
+    end);
+
+    AddBarButton('Watermark', function()
+        Library:ToggleManagedWindow('Watermark');
+    end);
+
+    Library.BottomBar = BarOuter;
+    return BarOuter;
 end;
 
 function Library:AddToolTip(InfoStr, HoverInstance)
@@ -3207,6 +3378,7 @@ do
     Library.Watermark = WatermarkOuter;
     Library.WatermarkText = WatermarkLabel;
     Library:MakeDraggable(Library.Watermark);
+    Library:RegisterManagedWindow('Watermark', WatermarkOuter, false);
 
 
 
@@ -3280,16 +3452,20 @@ do
     Library.KeybindFrame = KeybindOuter;
     Library.KeybindContainer = KeybindContainer;
     Library:MakeDraggable(KeybindOuter);
+    Library:RegisterManagedWindow('Keybinds', KeybindOuter, false);
 end;
 
 function Library:SetWatermarkVisibility(Bool)
+    if Library.ManagedWindows.Watermark then
+        Library.ManagedWindows.Watermark.Visible = Bool;
+    end;
+
     Library.Watermark.Visible = Bool;
 end;
 
 function Library:SetWatermark(Text)
     local X, Y = Library:GetTextBounds(Text, Library.Font, 14);
     Library.Watermark.Size = UDim2.new(0, X + 15, 0, (Y * 1.5) + 3);
-    Library:SetWatermarkVisibility(true)
 
     Library.WatermarkText.Text = Text;
 end;
@@ -3642,6 +3818,7 @@ function Library:CreateTargetInfo(Info)
     TargetInfo.Holder = TargetOuter;
     Library:MakeDraggable(TargetOuter, 999);
     TargetInfo:SetPlayer(Player);
+    Library:RegisterManagedWindow('TargetInfo', TargetInfo, Info.Visible ~= false);
 
     return TargetInfo;
 end;
@@ -4079,6 +4256,7 @@ function Library:CreatePlayerList(Info)
     Library:MakeDraggable(ListOuter, 24);
     PlayerList.Holder = ListOuter;
     PlayerList.Container = ActionsContainer;
+    Library:RegisterManagedWindow('PlayerList', PlayerList, Info.Visible ~= false);
 
     PlayerList:Refresh();
 
@@ -4734,6 +4912,7 @@ function Library:CreateWindow(...)
     local TransparencyCache = {};
     local Toggled = false;
     local Fading = false;
+    local BottomBar = Library:CreateBottomBar();
 
     function Library:Toggle()
         if Fading then
@@ -4744,6 +4923,8 @@ function Library:CreateWindow(...)
         Fading = true;
         Toggled = (not Toggled);
         ModalElement.Modal = Toggled;
+        BottomBar.Visible = Toggled;
+        Library:SetManagedWindowsOpen(Toggled);
 
         if Toggled then
             -- A bit scuffed, but if we're going from not toggled -> toggled we want to show the frame immediately so that the fade is visible.
@@ -4826,6 +5007,8 @@ function Library:CreateWindow(...)
         task.wait(FadeTime);
 
         Outer.Visible = Toggled;
+        BottomBar.Visible = Toggled;
+        Library:SetManagedWindowsOpen(Toggled);
 
         Fading = false;
     end
