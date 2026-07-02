@@ -3383,6 +3383,7 @@ function Library:CreateTargetInfo(Info)
         Player = nil;
         Connections = {};
         Armor = Info.Armor or Info.armor or Info.Shield or Info.shield or 50;
+        ArmorMax = Info.ArmorMax or Info.armorMax or Info.ShieldMax or Info.shieldMax or 100;
     };
 
     local TargetOuter = Library:Create('Frame', {
@@ -3421,7 +3422,7 @@ function Library:CreateTargetInfo(Info)
     Library:AddToRegistry(AccentBar, {
         BackgroundColor3 = 'AccentColor';
     }, true);
-    Library:AddGradient(AccentBar, 'AccentColor', 0);
+    Library:AddGradient(AccentBar, 'AccentColor', 0, true, true);
 
     local AvatarOuter = Library:Create('Frame', {
         BackgroundColor3 = Color3.new(0, 0, 0);
@@ -3459,22 +3460,26 @@ function Library:CreateTargetInfo(Info)
         Parent = TargetInner;
     }, true);
 
-    local HealthLabel = Library:CreateLabel({
-        Position = UDim2.new(0, 78, 0, 33);
-        Size = UDim2.new(1, -86, 0, 16);
-        Text = 'Health';
-        TextSize = 13;
-        TextXAlignment = Enum.TextXAlignment.Left;
-        ZIndex = 93;
-        Parent = TargetInner;
-    }, true);
+    local HealthLabel;
+
+    if not ShowShield then
+        HealthLabel = Library:CreateLabel({
+            Position = UDim2.new(0, 78, 0, 33);
+            Size = UDim2.new(1, -86, 0, 16);
+            Text = 'Health';
+            TextSize = 13;
+            TextXAlignment = Enum.TextXAlignment.Left;
+            ZIndex = 93;
+            Parent = TargetInner;
+        }, true);
+    end;
 
     local HealthBack = Library:Create('Frame', {
         BackgroundColor3 = Library.ControlColor;
         BorderColor3 = Library.OutlineColor;
         BorderMode = Enum.BorderMode.Inset;
-        Position = UDim2.new(0, 78, 0, 51);
-        Size = UDim2.new(1, -86, 0, 10);
+        Position = ShowShield and UDim2.new(0, 78, 0, 39) or UDim2.new(0, 78, 0, 51);
+        Size = ShowShield and UDim2.new(1, -86, 0, 16) or UDim2.new(1, -86, 0, 10);
         ZIndex = 92;
         Parent = TargetInner;
     });
@@ -3493,25 +3498,24 @@ function Library:CreateTargetInfo(Info)
         Parent = HealthBack;
     });
 
-    local ArmorLabel, ArmorBack, ArmorFill;
+    local HealthValueLabel = Library:CreateLabel({
+        Size = UDim2.new(1, 0, 1, 0);
+        Text = '';
+        TextSize = 13;
+        Visible = ShowShield;
+        ZIndex = 94;
+        Parent = HealthBack;
+    }, true);
+
+    local ArmorValueLabel, ArmorBack, ArmorFill;
 
     if ShowShield then
-        ArmorLabel = Library:CreateLabel({
-            Position = UDim2.new(0, 78, 0, 66);
-            Size = UDim2.new(1, -86, 0, 16);
-            Text = 'Armor';
-            TextSize = 13;
-            TextXAlignment = Enum.TextXAlignment.Left;
-            ZIndex = 93;
-            Parent = TargetInner;
-        }, true);
-
         ArmorBack = Library:Create('Frame', {
             BackgroundColor3 = Library.ControlColor;
             BorderColor3 = Library.OutlineColor;
             BorderMode = Enum.BorderMode.Inset;
-            Position = UDim2.new(0, 78, 0, 84);
-            Size = UDim2.new(1, -86, 0, 10);
+            Position = UDim2.new(0, 78, 0, 65);
+            Size = UDim2.new(1, -86, 0, 16);
             ZIndex = 92;
             Parent = TargetInner;
         });
@@ -3529,6 +3533,14 @@ function Library:CreateTargetInfo(Info)
             ZIndex = 93;
             Parent = ArmorBack;
         });
+
+        ArmorValueLabel = Library:CreateLabel({
+            Size = UDim2.new(1, 0, 1, 0);
+            Text = '';
+            TextSize = 13;
+            ZIndex = 94;
+            Parent = ArmorBack;
+        }, true);
     end;
 
     function TargetInfo:Disconnect()
@@ -3548,14 +3560,20 @@ function Library:CreateTargetInfo(Info)
             return;
         end;
 
-        local Percent = tonumber(Value) or 0;
-        if Percent > 1 then
-            Percent = Percent / 100;
+        local Numeric = tonumber(Value) or 0;
+        local ArmorMax = math.max(tonumber(self.ArmorMax) or 100, 1);
+        local DisplayValue = Numeric;
+        local Percent = Numeric;
+
+        if Numeric <= 1 then
+            DisplayValue = Numeric * ArmorMax;
+        else
+            Percent = Numeric / ArmorMax;
         end;
 
         Percent = math.clamp(Percent, 0, 1);
         ArmorFill.Size = UDim2.new(Percent, 0, 1, 0);
-        ArmorLabel.Text = string.format('Armor %d%%', math.floor(Percent * 100 + 0.5));
+        ArmorValueLabel.Text = string.format('%d/%d', math.floor(DisplayValue + 0.5), math.floor(ArmorMax + 0.5));
     end;
 
     function TargetInfo:SetHealth(Health, MaxHealth)
@@ -3564,7 +3582,13 @@ function Library:CreateTargetInfo(Info)
 
         local Percent = math.clamp(Health / MaxHealth, 0, 1);
         HealthFill.Size = UDim2.new(Percent, 0, 1, 0);
-        HealthLabel.Text = string.format('Health %d/%d', math.floor(Health + 0.5), math.floor(MaxHealth + 0.5));
+        local Text = string.format('%d/%d', math.floor(Health + 0.5), math.floor(MaxHealth + 0.5));
+
+        if HealthLabel then
+            HealthLabel.Text = 'Health ' .. Text;
+        end;
+
+        HealthValueLabel.Text = Text;
     end;
 
     function TargetInfo:SetPlayer(NewPlayer)
