@@ -2,7 +2,7 @@
 -- Based on ttwizz/Open-Aimbot (MIT): https://github.com/ttwizz/Open-Aimbot
 -- This keeps the core target/check/visual behavior and replaces the original Fluent UI with PureUI.
 
-local repo = 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/main/'
+local repo = 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/0561766e15b3dcf85031187e7a4fa4843df64b19/'
 local cacheBust = '?v=' .. tostring(os.time())
 
 local Library = loadstring(game:HttpGet(repo .. 'Library.lua' .. cacheBust))()
