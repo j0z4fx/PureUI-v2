@@ -127,6 +127,28 @@ Groupbox:AddBodySelector('BodyParts', {
 
 The body selector is a compact 2D R6 rig where each body part is clickable. Its value is a multi-select table shaped like `{ Head = true, Torso = true }`.
 
+### Curve Editor
+
+```lua
+Groupbox:AddCurveEditor('VisualCurve', {
+    Default = {
+        { X = 0, Y = 0 },
+        { X = 0.35, Y = 0.75 },
+        { X = 0.65, Y = 0.25 },
+        { X = 1, Y = 1 },
+    },
+    Callback = function(Value)
+        print(Value)
+    end,
+})
+```
+
+The curve editor is a compact draggable point editor for normalized `X/Y` control points. It draws a sampled accent curve and reports the current point table through the callback.
+
+### Icons
+
+Lucide icons are vendored in `addons/Lucide.lua` from `notpoiu/lucide-roblox-direct`. The bottom bar uses those icons directly and falls back to short text if the icon payload cannot load.
+
 ### Command Modal
 
 ```lua

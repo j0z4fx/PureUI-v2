@@ -193,6 +193,10 @@ function Library:MakeDraggable(Instance, Cutoff)
 
     Instance.InputBegan:Connect(function(Input)
         if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+            if Library.Resizing then
+                return;
+            end;
+
             local ObjPos = Vector2.new(
                 Mouse.X - Instance.AbsolutePosition.X,
                 Mouse.Y - Instance.AbsolutePosition.Y
@@ -283,6 +287,7 @@ function Library:MakeResizable(Instance, DefaultSize)
         local Anchor = Instance.AnchorPoint;
 
         SetActiveEdges(Edges, true);
+        Library.Resizing = true;
 
         while InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) do
             local Delta = Vector2.new(Mouse.X, Mouse.Y) - StartMouse;
@@ -302,10 +307,11 @@ function Library:MakeResizable(Instance, DefaultSize)
         end;
 
         SetActiveEdges(Edges, false);
+        Library.Resizing = false;
     end;
 
     local Handles = {
-        { Edges = { Top = true }, Position = UDim2.new(0, 8, 0, -3), Size = UDim2.new(1, -16, 0, 6) };
+        { Edges = { Top = true }, Position = UDim2.new(0, 56, 0, -3), Size = UDim2.new(1, -112, 0, 6) };
         { Edges = { Bottom = true }, Position = UDim2.new(0, 8, 1, -3), Size = UDim2.new(1, -16, 0, 6) };
         { Edges = { Left = true }, Position = UDim2.new(0, -3, 0, 8), Size = UDim2.new(0, 6, 1, -16) };
         { Edges = { Right = true }, Position = UDim2.new(1, -3, 0, 8), Size = UDim2.new(0, 6, 1, -16) };
@@ -378,6 +384,28 @@ function Library:SetManagedWindowsOpen(MenuOpen)
     end;
 end;
 
+function Library:GetLucideIcon(Name)
+    if not Library.Lucide then
+        local Ok, Module = pcall(function()
+            return loadstring(game:HttpGet('https://raw.githubusercontent.com/j0z4fx/PureUI-v2/main/addons/Lucide.lua'))();
+        end);
+
+        Library.Lucide = Ok and Module or false;
+    end;
+
+    if Library.Lucide and type(Library.Lucide.GetAsset) == 'function' then
+        local Ok, Asset = pcall(function()
+            return Library.Lucide.GetAsset(Name);
+        end);
+
+        if Ok then
+            return Asset;
+        end;
+    end;
+
+    return nil;
+end;
+
 function Library:CreateBottomBar()
     if Library.BottomBar then
         return Library.BottomBar;
@@ -387,7 +415,7 @@ function Library:CreateBottomBar()
         AnchorPoint = Vector2.new(0.5, 1);
         BorderColor3 = Color3.new(0, 0, 0);
         Position = UDim2.new(0.5, 0, 1, -12);
-        Size = UDim2.new(0, 500, 0, 28);
+        Size = UDim2.new(0, 232, 0, 28);
         Visible = false;
         ZIndex = 220;
         Parent = ScreenGui;
@@ -425,12 +453,12 @@ function Library:CreateBottomBar()
 
     local Buttons = {};
 
-    local function AddBarButton(Text, Callback)
+    local function AddBarButton(Text, IconName, Callback)
         local ButtonOuter = Library:Create('Frame', {
             Active = true;
             BackgroundColor3 = Color3.new(0, 0, 0);
             BorderColor3 = Color3.new(0, 0, 0);
-            Size = UDim2.new(0.2, -4, 1, 0);
+            Size = UDim2.new(0, 40, 1, 0);
             ZIndex = 223;
             Parent = ButtonHolder;
         });
@@ -454,13 +482,36 @@ function Library:CreateBottomBar()
         }, true);
         Library:AddGradient(ButtonInner, 'ControlColor');
 
-        Library:CreateLabel({
-            Size = UDim2.new(1, 0, 1, 0);
-            Text = Text;
-            TextSize = 13;
-            ZIndex = 225;
-            Parent = ButtonInner;
-        }, true);
+        local IconAsset = Library:GetLucideIcon(IconName);
+
+        if IconAsset then
+            local Icon = Library:Create('ImageLabel', {
+                AnchorPoint = Vector2.new(0.5, 0.5);
+                BackgroundTransparency = 1;
+                Image = IconAsset.Url;
+                ImageColor3 = Library.FontColor;
+                ImageRectOffset = IconAsset.ImageRectOffset;
+                ImageRectSize = IconAsset.ImageRectSize;
+                Position = UDim2.fromScale(0.5, 0.5);
+                Size = UDim2.fromOffset(16, 16);
+                ZIndex = 225;
+                Parent = ButtonInner;
+            });
+
+            Library:AddToRegistry(Icon, {
+                ImageColor3 = 'FontColor';
+            }, true);
+        else
+            Library:CreateLabel({
+                Size = UDim2.new(1, 0, 1, 0);
+                Text = string.sub(Text, 1, 1);
+                TextSize = 13;
+                ZIndex = 225;
+                Parent = ButtonInner;
+            }, true);
+        end;
+
+        Library:AddToolTip(Text, ButtonOuter);
 
         ButtonOuter.MouseEnter:Connect(function()
             Library:Tween(ButtonInner, 0.1, { BackgroundColor3 = Library:GetLighterColor(Library.ControlColor) });
@@ -479,23 +530,23 @@ function Library:CreateBottomBar()
         table.insert(Buttons, ButtonOuter);
     end;
 
-    AddBarButton('Keybinds', function()
+    AddBarButton('Keybinds', 'keyboard', function()
         Library:ToggleManagedWindow('Keybinds');
     end);
 
-    AddBarButton('Menu', function()
+    AddBarButton('Menu', 'panel-top', function()
         task.spawn(Library.Toggle);
     end);
 
-    AddBarButton('Players', function()
+    AddBarButton('Players', 'users', function()
         Library:ToggleManagedWindow('PlayerList');
     end);
 
-    AddBarButton('Target', function()
+    AddBarButton('Target', 'crosshair', function()
         Library:ToggleManagedWindow('TargetInfo');
     end);
 
-    AddBarButton('Watermark', function()
+    AddBarButton('Watermark', 'badge-info', function()
         Library:ToggleManagedWindow('Watermark');
     end);
 
@@ -3873,6 +3924,10 @@ do
         RecalculateListSize();
 
         DropdownOuter:GetPropertyChangedSignal('AbsolutePosition'):Connect(RecalculateListPosition);
+        DropdownOuter:GetPropertyChangedSignal('AbsoluteSize'):Connect(function()
+            RecalculateListPosition();
+            RecalculateListSize();
+        end);
 
         local ListInner = Library:Create('Frame', {
             BackgroundColor3 = Library.ControlColor;
@@ -4196,6 +4251,197 @@ do
         Options[Idx] = Dropdown;
 
         return Dropdown;
+    end;
+
+    function Funcs:AddCurveEditor(Idx, Info)
+        Info = Info or {};
+
+        local Groupbox = self;
+        local Container = Groupbox.Container;
+        local Height = Info.Height or 150;
+        local Curve = {
+            Type = 'CurveEditor';
+            Value = Info.Default or {
+                { X = 0, Y = 0 };
+                { X = 0.35, Y = 0.75 };
+                { X = 0.65, Y = 0.25 };
+                { X = 1, Y = 1 };
+            };
+            Callback = Info.Callback or function(Value) end;
+        };
+
+        if Info.Text then
+            Library:CreateLabel({
+                Size = UDim2.new(1, 0, 0, 14);
+                TextSize = 14;
+                Text = Info.Text;
+                TextXAlignment = Enum.TextXAlignment.Left;
+                TextYAlignment = Enum.TextYAlignment.Bottom;
+                ZIndex = 5;
+                Parent = Container;
+            });
+            Groupbox:AddBlank(3);
+        end;
+
+        local Outer = Library:Create('Frame', {
+            BackgroundColor3 = Color3.new(0, 0, 0);
+            BorderColor3 = Color3.new(0, 0, 0);
+            Size = UDim2.new(1, -4, 0, Height);
+            ZIndex = 5;
+            Parent = Container;
+        });
+
+        Library:AddToRegistry(Outer, { BorderColor3 = 'Black' });
+
+        local Canvas = Library:Create('Frame', {
+            BackgroundColor3 = Library.ControlColor;
+            BorderColor3 = Library.OutlineColor;
+            BorderMode = Enum.BorderMode.Inset;
+            ClipsDescendants = true;
+            Size = UDim2.new(1, 0, 1, 0);
+            ZIndex = 6;
+            Parent = Outer;
+        });
+
+        Library:AddToRegistry(Canvas, {
+            BackgroundColor3 = 'ControlColor';
+            BorderColor3 = 'OutlineColor';
+        });
+        Library:AddGradient(Canvas, 'ControlColor');
+
+        local Lines = {};
+        local Handles = {};
+
+        local function CopyPoints(Points)
+            local Out = {};
+            for Index, Point in ipairs(Points) do
+                Out[Index] = {
+                    X = math.clamp(tonumber(Point.X) or 0, 0, 1);
+                    Y = math.clamp(tonumber(Point.Y) or 0, 0, 1);
+                };
+            end;
+            table.sort(Out, function(A, B) return A.X < B.X end);
+            return Out;
+        end;
+
+        local function Sample(Points, T)
+            if T <= Points[1].X then return Points[1].Y end;
+            if T >= Points[#Points].X then return Points[#Points].Y end;
+
+            for Index = 1, #Points - 1 do
+                local A = Points[Index];
+                local B = Points[Index + 1];
+                if T >= A.X and T <= B.X then
+                    local Alpha = (T - A.X) / math.max(B.X - A.X, 0.001);
+                    Alpha = Alpha * Alpha * (3 - (2 * Alpha));
+                    return A.Y + ((B.Y - A.Y) * Alpha);
+                end;
+            end;
+
+            return 0;
+        end;
+
+        local function PointToCanvas(Point)
+            local Size = Canvas.AbsoluteSize;
+            return Vector2.new(Point.X * Size.X, (1 - Point.Y) * Size.Y);
+        end;
+
+        local function SetLine(Line, From, To)
+            local Delta = To - From;
+            Line.Position = UDim2.fromOffset(From.X, From.Y);
+            Line.Size = UDim2.fromOffset(Delta.Magnitude, 2);
+            Line.Rotation = math.deg(math.atan2(Delta.Y, Delta.X));
+        end;
+
+        local function Redraw()
+            local Points = CopyPoints(Curve.Value);
+            local Samples = 24;
+
+            for Index = 1, Samples do
+                local T0 = (Index - 1) / Samples;
+                local T1 = Index / Samples;
+                local From = PointToCanvas({ X = T0, Y = Sample(Points, T0) });
+                local To = PointToCanvas({ X = T1, Y = Sample(Points, T1) });
+                SetLine(Lines[Index], From, To);
+            end;
+
+            for Index, Handle in ipairs(Handles) do
+                local Point = Curve.Value[Index];
+                if Point then
+                    Handle.Position = UDim2.fromOffset(Point.X * Canvas.AbsoluteSize.X, (1 - Point.Y) * Canvas.AbsoluteSize.Y);
+                end;
+            end;
+        end;
+
+        for Index = 1, 24 do
+            Lines[Index] = Library:Create('Frame', {
+                AnchorPoint = Vector2.new(0, 0.5);
+                BackgroundColor3 = Library.AccentColor;
+                BorderSizePixel = 0;
+                ZIndex = 8;
+                Parent = Canvas;
+            });
+            Library:AddToRegistry(Lines[Index], { BackgroundColor3 = 'AccentColor' });
+            Library:AddGradient(Lines[Index], 'AccentColor', 0, true, true);
+        end;
+
+        for Index = 1, #Curve.Value do
+            local Handle = Library:Create('Frame', {
+                Active = true;
+                AnchorPoint = Vector2.new(0.5, 0.5);
+                BackgroundColor3 = Library.BackgroundColor;
+                BorderColor3 = Library.AccentColor;
+                BorderMode = Enum.BorderMode.Inset;
+                Size = UDim2.fromOffset(10, 10);
+                ZIndex = 10;
+                Parent = Canvas;
+            });
+            Library:AddToRegistry(Handle, {
+                BackgroundColor3 = 'BackgroundColor';
+                BorderColor3 = 'AccentColor';
+            });
+            Library:AddGradient(Handle, 'BackgroundColor');
+
+            Handle.InputBegan:Connect(function(Input)
+                if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    while InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) do
+                        local Local = Vector2.new(Mouse.X, Mouse.Y) - Canvas.AbsolutePosition;
+                        Curve.Value[Index] = {
+                            X = math.clamp(Local.X / math.max(Canvas.AbsoluteSize.X, 1), 0, 1);
+                            Y = math.clamp(1 - (Local.Y / math.max(Canvas.AbsoluteSize.Y, 1)), 0, 1);
+                        };
+                        Redraw();
+                        Library:SafeCallback(Curve.Callback, Curve.Value);
+                        Library:SafeCallback(Curve.Changed, Curve.Value);
+                        RenderStepped:Wait();
+                    end;
+                    Library:AttemptSave();
+                end;
+            end);
+
+            Handles[Index] = Handle;
+        end;
+
+        function Curve:SetValue(Value)
+            self.Value = CopyPoints(Value);
+            Redraw();
+            Library:SafeCallback(self.Callback, self.Value);
+            Library:SafeCallback(self.Changed, self.Value);
+        end;
+
+        function Curve:OnChanged(Func)
+            self.Changed = Func;
+            Func(self.Value);
+        end;
+
+        Canvas:GetPropertyChangedSignal('AbsoluteSize'):Connect(Redraw);
+        task.defer(Redraw);
+
+        Groupbox:AddBlank(Info.BlankSize or 5);
+        Groupbox:Resize();
+
+        Options[Idx] = Curve;
+        return Curve;
     end;
 
     function Funcs:AddBodySelector(Idx, Info)
@@ -5862,6 +6108,7 @@ function Library:CreatePlayerList(Info)
     end;
 
     Library:MakeDraggable(ListOuter, 24);
+    Library:MakeResizable(ListOuter, Vector2.new(ListOuter.Size.X.Offset, ListOuter.Size.Y.Offset));
     PlayerList.Holder = ListOuter;
     PlayerList.Container = ActionsContainer;
     PlayerList.SearchBox = SearchBox;
@@ -6188,6 +6435,7 @@ function Library:CreateEspPreview(Info)
 
     local Spacing = Info.Spacing or 8;
     local DesiredVisible = Info.Visible ~= false;
+    local RenderVisible = false;
     local Angle = 0;
     local CurrentClone;
     local IdleTrack;
@@ -6290,13 +6538,49 @@ function Library:CreateEspPreview(Info)
     local World = Instance.new('WorldModel');
     World.Parent = Viewport;
 
-    local function UpdateAttachment()
-        PreviewOuter.Position = UDim2.fromOffset(
-            Holder.AbsolutePosition.X + Holder.AbsoluteSize.X + Spacing,
-            Holder.AbsolutePosition.Y
-        );
+    local function GetTargetPosition(Hidden)
+        local ViewportSize = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1920, 1080);
+        local HolderLeft = Holder.AbsolutePosition.X;
+        local HolderCenter = HolderLeft + (Holder.AbsoluteSize.X / 2);
+        local PreviewWidth = PreviewOuter.AbsoluteSize.X > 0 and PreviewOuter.AbsoluteSize.X or PreviewOuter.Size.X.Offset;
+        local X;
 
-        PreviewOuter.Visible = DesiredVisible and Holder.Visible;
+        if Hidden then
+            X = HolderLeft + math.max((Holder.AbsoluteSize.X - PreviewWidth) / 2, 0);
+        elseif HolderCenter > (ViewportSize.X / 2) then
+            X = HolderLeft - PreviewWidth - Spacing;
+        else
+            X = HolderLeft + Holder.AbsoluteSize.X + Spacing;
+        end;
+
+        return UDim2.fromOffset(X, Holder.AbsolutePosition.Y);
+    end;
+
+    local function UpdateAttachment(Instant)
+        local ShouldShow = DesiredVisible and Holder.Visible;
+        local Target = GetTargetPosition(not ShouldShow);
+
+        if ShouldShow then
+            RenderVisible = true;
+            PreviewOuter.Visible = true;
+            if Instant or not PreviewOuter.Visible then
+                PreviewOuter.Position = Target;
+            else
+                Library:Tween(PreviewOuter, 0.18, { Position = Target });
+            end;
+        elseif RenderVisible then
+            RenderVisible = false;
+            PreviewOuter.Visible = true;
+            Library:Tween(PreviewOuter, 0.16, { Position = Target });
+            task.delay(0.17, function()
+                if not RenderVisible then
+                    PreviewOuter.Visible = false;
+                end;
+            end);
+        else
+            PreviewOuter.Visible = false;
+            PreviewOuter.Position = Target;
+        end;
     end;
 
     local function StripClone(Clone)
@@ -6420,7 +6704,7 @@ function Library:CreateEspPreview(Info)
     Preview.Holder = PreviewOuter;
     Preview.Viewport = Viewport;
     Preview:RefreshAvatar();
-    UpdateAttachment();
+    UpdateAttachment(true);
 
     return Preview;
 end;
@@ -6482,6 +6766,27 @@ function Library:CreateWindow(...)
         BackgroundColor3 = 'MainColor';
         BorderColor3 = 'AccentColor';
     });
+
+    for _, StrokeInfo in next, {
+        { Position = UDim2.new(0, 0, 0, 0), Size = UDim2.new(1, 0, 0, 1) };
+        { Position = UDim2.new(0, 0, 1, -1), Size = UDim2.new(1, 0, 0, 1) };
+        { Position = UDim2.new(0, 0, 0, 0), Size = UDim2.new(0, 1, 1, 0) };
+        { Position = UDim2.new(1, -1, 0, 0), Size = UDim2.new(0, 1, 1, 0) };
+    } do
+        local AccentStroke = Library:Create('Frame', {
+            BackgroundColor3 = Library.AccentColor;
+            BorderSizePixel = 0;
+            Position = StrokeInfo.Position;
+            Size = StrokeInfo.Size;
+            ZIndex = 3;
+            Parent = Inner;
+        });
+
+        Library:AddToRegistry(AccentStroke, {
+            BackgroundColor3 = 'AccentColor';
+        });
+        Library:AddGradient(AccentStroke, 'AccentColor', 0, true, true);
+    end;
 
     local WindowLabel = Library:CreateLabel({
         Position = UDim2.new(0, 7, 0, 0);
@@ -6576,6 +6881,7 @@ function Library:CreateWindow(...)
         local Tab = {
             Groupboxes = {};
             Tabboxes = {};
+            Name = Name;
         };
 
         local TabButton = Library:Create('Frame', {
@@ -6701,6 +7007,11 @@ function Library:CreateWindow(...)
             Library:Tween(Blocker, 0.12, { BackgroundTransparency = 0 });
             Library:Tween(TabHighlight, 0.12, { BackgroundTransparency = 0 });
             TabFrame.Visible = true;
+
+            Window.ActiveTab = Name;
+            if Window.TabChanged then
+                Library:SafeCallback(Window.TabChanged, Name, Tab);
+            end;
         end;
 
         function Tab:HideTab()
@@ -7042,6 +7353,13 @@ function Library:CreateWindow(...)
         Window.Tabs[Name] = Tab;
         ReflowTabs();
         return Tab;
+    end;
+
+    function Window:OnTabChanged(Callback)
+        Window.TabChanged = Callback;
+        if Window.ActiveTab then
+            Library:SafeCallback(Callback, Window.ActiveTab, Window.Tabs[Window.ActiveTab]);
+        end;
     end;
 
     local ModalElement = Library:Create('TextButton', {
