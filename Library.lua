@@ -4203,8 +4203,8 @@ do
             { Key = 'Torso', Text = 'Torso', Position = UDim2.fromOffset(78, 34), Size = UDim2.fromOffset(64, 64) };
             { Key = 'LeftArm', Text = 'L Arm', Position = UDim2.fromOffset(48, 34), Size = UDim2.fromOffset(28, 64) };
             { Key = 'RightArm', Text = 'R Arm', Position = UDim2.fromOffset(144, 34), Size = UDim2.fromOffset(28, 64) };
-            { Key = 'LeftLeg', Text = 'L Leg', Position = UDim2.fromOffset(80, 100), Size = UDim2.fromOffset(28, 64) };
-            { Key = 'RightLeg', Text = 'R Leg', Position = UDim2.fromOffset(112, 100), Size = UDim2.fromOffset(28, 64) };
+            { Key = 'LeftLeg', Text = 'L Leg', Position = UDim2.fromOffset(78, 100), Size = UDim2.fromOffset(31, 64) };
+            { Key = 'RightLeg', Text = 'R Leg', Position = UDim2.fromOffset(111, 100), Size = UDim2.fromOffset(31, 64) };
         };
 
         local Buttons = {};
