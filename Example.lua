@@ -1,7 +1,7 @@
 -- New example script written by wally
 -- You can suggest changes with a pull request or something
 
-local repo = 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/baee873/'
+local repo = 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/a3e58cf/'
 local cacheBust = '?v=' .. tostring(os.time())
 
 local Library = loadstring(game:HttpGet(repo .. 'Library.lua' .. cacheBust))()
@@ -24,6 +24,17 @@ local TargetInfo = Library:CreateTargetInfo({
 
 local PlayerList = Library:CreatePlayerList({
     Title = 'Players',
+})
+
+local FovCircle = Library:CreateFovCircle({
+    Visible = true,
+    Shape = 'Circle',
+    Radius = 120,
+    Sides = 64,
+    Color = Color3.new(1, 1, 1),
+    FillColor = Color3.new(1, 1, 1),
+    Thickness = 1,
+    Filled = false,
 })
 
 PlayerList:AddButton({
@@ -432,6 +443,93 @@ BodyGroupbox:AddBodySelector('BodyParts', {
     Default = { Head = true, Torso = true },
     Callback = function(Value)
         print('[cb] Body parts changed:', Value)
+    end,
+})
+
+local FovGroupbox = Tabs.Main:AddRightGroupbox('FOV circle');
+
+FovGroupbox:AddToggle('FovVisible', {
+    Text = 'Visible',
+    Default = true,
+    Callback = function(Value)
+        FovCircle:SetVisible(Value);
+    end,
+})
+
+FovGroupbox:AddDropdown('FovShape', {
+    Text = 'Shape',
+    Values = { 'Circle', 'Square' },
+    Default = 'Circle',
+    Callback = function(Value)
+        FovCircle:Set('Shape', Value);
+    end,
+})
+
+FovGroupbox:AddSlider('FovRadius', {
+    Text = 'Radius',
+    Default = 120,
+    Min = 20,
+    Max = 500,
+    Rounding = 0,
+    Callback = function(Value)
+        FovCircle:Set('Radius', Value);
+    end,
+})
+
+FovGroupbox:AddSlider('FovSides', {
+    Text = 'Sides',
+    Default = 64,
+    Min = 3,
+    Max = 128,
+    Rounding = 0,
+    Callback = function(Value)
+        FovCircle:Set('Sides', Value);
+    end,
+})
+
+FovGroupbox:AddSlider('FovThickness', {
+    Text = 'Thickness',
+    Default = 1,
+    Min = 1,
+    Max = 8,
+    Rounding = 0,
+    Callback = function(Value)
+        FovCircle:Set('Thickness', Value);
+    end,
+})
+
+FovGroupbox:AddToggle('FovFilled', {
+    Text = 'Fill',
+    Default = false,
+    Callback = function(Value)
+        FovCircle:Set('Filled', Value);
+    end,
+})
+
+FovGroupbox:AddSlider('FovFillTransparency', {
+    Text = 'Fill opacity',
+    Default = 0.18,
+    Min = 0,
+    Max = 1,
+    Rounding = 2,
+    Callback = function(Value)
+        FovCircle:Set('FillTransparency', Value);
+    end,
+})
+
+FovGroupbox:AddLabel('Outline color'):AddColorPicker('FovOutlineColor', {
+    Default = Color3.new(1, 1, 1),
+    Title = 'FOV outline color',
+    Callback = function(Value)
+        FovCircle:Set('Color', Value);
+    end,
+})
+
+FovGroupbox:AddLabel('Fill color'):AddColorPicker('FovFillColor', {
+    Default = Color3.new(1, 1, 1),
+    Title = 'FOV fill color',
+    Callback = function(Value)
+        FovCircle:Set('FillColor', Value);
     end,
 })
 
