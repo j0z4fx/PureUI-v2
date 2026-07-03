@@ -1,7 +1,7 @@
 -- New example script written by wally
 -- You can suggest changes with a pull request or something
 
-local repo = 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/a3e58cf/'
+local repo = 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/bd19c9c/'
 local cacheBust = '?v=' .. tostring(os.time())
 
 local Library = loadstring(game:HttpGet(repo .. 'Library.lua' .. cacheBust))()
@@ -32,9 +32,16 @@ local FovCircle = Library:CreateFovCircle({
     Radius = 120,
     Sides = 64,
     Color = Color3.new(1, 1, 1),
+    GradientColor = Color3.fromRGB(216, 114, 150),
     FillColor = Color3.new(1, 1, 1),
+    FillGradientColor = Color3.fromRGB(216, 114, 150),
     Thickness = 1,
     Filled = false,
+    Gradient = true,
+    GradientType = 'Linear',
+    GradientDirection = 'Clockwise',
+    GradientSpeed = 0.35,
+    Smoothing = 0.15,
 })
 
 PlayerList:AddButton({
@@ -498,11 +505,67 @@ FovGroupbox:AddSlider('FovThickness', {
     end,
 })
 
+FovGroupbox:AddSlider('FovSmoothing', {
+    Text = 'Smoothing',
+    Default = 0.15,
+    Min = 0,
+    Max = 0.98,
+    Rounding = 2,
+    Callback = function(Value)
+        FovCircle:Set('Smoothing', Value);
+    end,
+})
+
 FovGroupbox:AddToggle('FovFilled', {
     Text = 'Fill',
     Default = false,
     Callback = function(Value)
         FovCircle:Set('Filled', Value);
+    end,
+})
+
+FovGroupbox:AddToggle('FovGradient', {
+    Text = 'Gradient',
+    Default = true,
+    Callback = function(Value)
+        FovCircle:Set('Gradient', Value);
+    end,
+})
+
+FovGroupbox:AddDropdown('FovGradientType', {
+    Text = 'Gradient type',
+    Values = { 'Linear', 'Radial', 'Pulse', 'Rainbow' },
+    Default = 'Linear',
+    Callback = function(Value)
+        FovCircle:Set('GradientType', Value);
+    end,
+})
+
+FovGroupbox:AddDropdown('FovGradientDirection', {
+    Text = 'Direction',
+    Values = { 'Clockwise', 'CounterClockwise' },
+    Default = 'Clockwise',
+    Callback = function(Value)
+        FovCircle:Set('GradientDirection', Value);
+    end,
+})
+
+FovGroupbox:AddToggle('FovGradientRotation', {
+    Text = 'Animate',
+    Default = true,
+    Callback = function(Value)
+        FovCircle:Set('GradientRotation', Value);
+    end,
+})
+
+FovGroupbox:AddSlider('FovGradientSpeed', {
+    Text = 'Gradient speed',
+    Default = 0.35,
+    Min = 0,
+    Max = 2,
+    Rounding = 2,
+    Callback = function(Value)
+        FovCircle:Set('GradientSpeed', Value);
     end,
 })
 
@@ -525,11 +588,27 @@ FovGroupbox:AddLabel('Outline color'):AddColorPicker('FovOutlineColor', {
     end,
 })
 
+FovGroupbox:AddLabel('Outline gradient'):AddColorPicker('FovOutlineGradientColor', {
+    Default = Color3.fromRGB(216, 114, 150),
+    Title = 'FOV outline gradient color',
+    Callback = function(Value)
+        FovCircle:Set('GradientColor', Value);
+    end,
+})
+
 FovGroupbox:AddLabel('Fill color'):AddColorPicker('FovFillColor', {
     Default = Color3.new(1, 1, 1),
     Title = 'FOV fill color',
     Callback = function(Value)
         FovCircle:Set('FillColor', Value);
+    end,
+})
+
+FovGroupbox:AddLabel('Fill gradient'):AddColorPicker('FovFillGradientColor', {
+    Default = Color3.fromRGB(216, 114, 150),
+    Title = 'FOV fill gradient color',
+    Callback = function(Value)
+        FovCircle:Set('FillGradientColor', Value);
     end,
 })
 
