@@ -1,7 +1,7 @@
 -- New example script written by wally
 -- You can suggest changes with a pull request or something
 
-local repo = 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/91e66d5/'
+local repo = 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/d12856c/'
 local cacheBust = '?v=' .. tostring(os.time())
 
 local Library = loadstring(game:HttpGet(repo .. 'Library.lua' .. cacheBust))()
@@ -117,8 +117,14 @@ local EspPreview = Window:AddEspPreview({
 local Tabs = {
     -- Creates a new tab titled Main
     Main = Window:AddTab('Main'),
+    Visuals = Window:AddTab('Visuals'),
     ['UI Settings'] = Window:AddTab('UI Settings'),
 }
+
+EspPreview:SetVisible(false)
+Window:OnTabChanged(function(Name)
+    EspPreview:SetVisible(Name == 'Visuals')
+end)
 
 -- Groupbox and Tabbox inherit the same functions
 -- except Tabboxes you have to call the functions on a tab (Tabbox:AddTab(name))
@@ -453,7 +459,7 @@ BodyGroupbox:AddBodySelector('BodyParts', {
     end,
 })
 
-local FovGroupbox = Tabs.Main:AddRightGroupbox('FOV circle');
+local FovGroupbox = Tabs.Visuals:AddLeftGroupbox('FOV circle');
 
 FovGroupbox:AddToggle('FovVisible', {
     Text = 'Visible',
@@ -594,6 +600,19 @@ FovGroupbox:AddLabel('Fill color'):AddColorPicker('FovFillColor', {
     Title = 'FOV fill color',
     Callback = function(Value)
         FovCircle:Set('FillColor', Value);
+    end,
+})
+
+local CurveGroupbox = Tabs.Visuals:AddRightGroupbox('Curve editor');
+CurveGroupbox:AddCurveEditor('VisualCurve', {
+    Default = {
+        { X = 0, Y = 0 };
+        { X = 0.25, Y = 0.72 };
+        { X = 0.7, Y = 0.28 };
+        { X = 1, Y = 1 };
+    },
+    Callback = function(Value)
+        print('[cb] Curve changed:', Value)
     end,
 })
 
