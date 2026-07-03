@@ -5896,8 +5896,9 @@ function Library:CreateFovCircle(Info)
     local HasDrawing = typeof(Drawing) == 'table' and type(Drawing.new) == 'function';
     assert(HasDrawing, 'CreateFovCircle: Drawing API is not available.');
 
-    local MaxSegments = 128;
-    local FillLayerCount = 12;
+    local MaxSegments = 96;
+    local MaxAccentSegments = 28;
+    local GlowLayerCount = 4;
     local MousePosition = InputService:GetMouseLocation();
 
     local Fov = {
@@ -5906,25 +5907,27 @@ function Library:CreateFovCircle(Info)
         Shape = Info.Shape or 'Circle';
         Radius = Info.Radius or 120;
         Sides = Info.Sides or 64;
-        Thickness = Info.Thickness or 1;
+        Thickness = Info.Thickness or 1.5;
         Filled = Info.Filled == true;
-        Color = Info.Color or Color3.new(1, 1, 1);
-        GradientColor = Info.GradientColor or Info.SecondaryColor or Color3.fromRGB(216, 114, 150);
-        FillColor = Info.FillColor or Info.Color or Color3.new(1, 1, 1);
-        FillGradientColor = Info.FillGradientColor or Info.GradientColor or Info.SecondaryColor or Color3.fromRGB(216, 114, 150);
-        Transparency = Info.Transparency or 1;
-        FillTransparency = Info.FillTransparency or 0.18;
-        Gradient = Info.Gradient == true;
-        GradientType = Info.GradientType or 'Linear';
+        Color = Info.Color or Color3.fromRGB(245, 245, 245);
+        AccentColor = Info.AccentColor or Info.GradientColor or Info.SecondaryColor or Color3.fromRGB(216, 114, 150);
+        FillColor = Info.FillColor or Info.Color or Color3.fromRGB(245, 245, 245);
+        Transparency = Info.Transparency or 0.72;
+        FillTransparency = Info.FillTransparency or 0.06;
+        Glow = Info.Glow == true;
+        GlowTransparency = Info.GlowTransparency or 0.12;
+        Sweep = Info.Sweep ~= false;
+        SweepSize = Info.SweepSize or 0.16;
         GradientDirection = Info.GradientDirection or 'Clockwise';
         GradientRotation = Info.GradientRotation ~= false;
-        GradientSpeed = Info.GradientSpeed or 0.35;
+        GradientSpeed = Info.GradientSpeed or 0.22;
         Smoothing = Info.Smoothing or 0;
         Phase = 0;
         CurrentPosition = MousePosition;
         Drawings = {};
-        OutlineSegments = {};
-        FillLayers = {};
+        BaseSegments = {};
+        AccentSegments = {};
+        GlowLayers = {};
     };
 
     local function Track(DrawingObject)
@@ -5934,34 +5937,35 @@ function Library:CreateFovCircle(Info)
     end;
 
     for Index = 1, MaxSegments do
-        Fov.OutlineSegments[Index] = Track(Drawing.new('Line'));
+        Fov.BaseSegments[Index] = Track(Drawing.new('Line'));
         pcall(function()
-            Fov.OutlineSegments[Index].ZIndex = 2;
+            Fov.BaseSegments[Index].ZIndex = 2;
         end);
     end;
 
-    for Index = 1, FillLayerCount do
-        Fov.FillLayers[Index] = {
-            Circle = Track(Drawing.new('Circle'));
-            Square = Track(Drawing.new('Square'));
-        };
+    for Index = 1, MaxAccentSegments do
+        Fov.AccentSegments[Index] = Track(Drawing.new('Line'));
         pcall(function()
-            Fov.FillLayers[Index].Circle.ZIndex = 1;
-            Fov.FillLayers[Index].Square.ZIndex = 1;
+            Fov.AccentSegments[Index].ZIndex = 4;
         end);
     end;
 
-    local function LerpColor(From, To, Alpha)
-        return Color3.new(
-            From.R + ((To.R - From.R) * Alpha),
-            From.G + ((To.G - From.G) * Alpha),
-            From.B + ((To.B - From.B) * Alpha)
-        );
+    for Index = 1, GlowLayerCount do
+        Fov.GlowLayers[Index] = Track(Drawing.new('Circle'));
+        pcall(function()
+            Fov.GlowLayers[Index].ZIndex = 1;
+        end);
     end;
 
-    local function Wave(Value)
-        return 0.5 - (math.cos((Value % 1) * math.pi * 2) * 0.5);
-    end;
+    local FillCircle = Track(Drawing.new('Circle'));
+    local FillSquare = Track(Drawing.new('Square'));
+    local SquareStroke = Track(Drawing.new('Square'));
+
+    pcall(function()
+        FillCircle.ZIndex = 1;
+        FillSquare.ZIndex = 1;
+        SquareStroke.ZIndex = 2;
+    end);
 
     local function DirectionMultiplier(Direction)
         Direction = tostring(Direction):lower();
@@ -5971,25 +5975,6 @@ function Library:CreateFovCircle(Info)
         end;
 
         return 1;
-    end;
-
-    local function ColorAt(First, Second, Position, Phase, GradientType, GradientEnabled)
-        if not GradientEnabled then
-            return First;
-        end;
-
-        GradientType = tostring(GradientType):lower();
-        Position = (Position + Phase) % 1;
-
-        if GradientType == 'rainbow' then
-            return Color3.fromHSV(Position, 0.85, 1);
-        elseif GradientType == 'pulse' then
-            return LerpColor(First, Second, Wave(Phase));
-        elseif GradientType == 'radial' then
-            return LerpColor(First, Second, math.clamp(Position, 0, 1));
-        end;
-
-        return LerpColor(First, Second, Wave(Position));
     end;
 
     local function SquarePoint(Center, Radius, T)
@@ -6008,6 +5993,23 @@ function Library:CreateFovCircle(Info)
         return Center + Vector2.new(-Radius, -Offset * Radius);
     end;
 
+    local function ShapePoint(IsSquare, Center, Radius, T)
+        if IsSquare then
+            return SquarePoint(Center, Radius, T);
+        end;
+
+        local Angle = (T % 1) * math.pi * 2;
+        return Center + Vector2.new(math.cos(Angle) * Radius, math.sin(Angle) * Radius);
+    end;
+
+    local function SetLine(Line, FromPoint, ToPoint, Color, Thickness, Transparency)
+        Line.From = FromPoint;
+        Line.To = ToPoint;
+        Line.Color = Color;
+        Line.Thickness = Thickness;
+        Line.Transparency = math.clamp(Transparency, 0, 1);
+    end;
+
     function Fov:Update(Delta)
         Delta = Delta or 0;
         local TargetPosition = InputService:GetMouseLocation();
@@ -6022,62 +6024,93 @@ function Library:CreateFovCircle(Info)
 
         local IsSquare = tostring(self.Shape):lower() == 'square';
         local ShouldShow = self.Enabled and self.Visible;
-        local FillVisible = ShouldShow and self.Filled;
         local Radius = math.max(self.Radius, 1);
         local SegmentCount = IsSquare and math.clamp(math.floor(self.Sides), 4, MaxSegments) or math.clamp(math.floor(self.Sides), 3, MaxSegments);
         local Center = self.CurrentPosition;
+        local Thickness = math.max(self.Thickness, 1);
 
-        for Index, Line in next, self.OutlineSegments do
+        SquareStroke.Visible = ShouldShow and IsSquare;
+        if SquareStroke.Visible then
+            SquareStroke.Filled = false;
+            SquareStroke.Position = Center - Vector2.new(Radius, Radius);
+            SquareStroke.Size = Vector2.new(Radius * 2, Radius * 2);
+            SquareStroke.Color = self.Color;
+            SquareStroke.Thickness = Thickness;
+            SquareStroke.Transparency = math.clamp(self.Transparency, 0, 1);
+        end;
+
+        for Index, Line in next, self.BaseSegments do
             local Active = ShouldShow and Index <= SegmentCount;
-            Line.Visible = Active;
+            Line.Visible = Active and not IsSquare;
 
-            if Active then
+            if Active and not IsSquare then
                 local FromAlpha = (Index - 1) / SegmentCount;
                 local ToAlpha = Index / SegmentCount;
-                local FromPoint;
-                local ToPoint;
-
-                if IsSquare then
-                    FromPoint = SquarePoint(Center, Radius, FromAlpha);
-                    ToPoint = SquarePoint(Center, Radius, ToAlpha);
-                else
-                    local FromAngle = FromAlpha * math.pi * 2;
-                    local ToAngle = ToAlpha * math.pi * 2;
-                    FromPoint = Center + Vector2.new(math.cos(FromAngle) * Radius, math.sin(FromAngle) * Radius);
-                    ToPoint = Center + Vector2.new(math.cos(ToAngle) * Radius, math.sin(ToAngle) * Radius);
-                end;
-
-                Line.From = FromPoint;
-                Line.To = ToPoint;
-                Line.Thickness = math.max(self.Thickness, 1);
-                Line.Transparency = math.clamp(self.Transparency, 0, 1);
-                Line.Color = ColorAt(self.Color, self.GradientColor, FromAlpha, self.Phase, self.GradientType, self.Gradient);
+                SetLine(
+                    Line,
+                    ShapePoint(false, Center, Radius, FromAlpha),
+                    ShapePoint(false, Center, Radius, ToAlpha),
+                    self.Color,
+                    Thickness,
+                    self.Transparency
+                );
             end;
         end;
 
-        for Index, Layer in next, self.FillLayers do
-            local Active = FillVisible and Index <= FillLayerCount;
-            local LayerAlpha = Index / FillLayerCount;
-            local LayerRadius = Radius * (1 - ((Index - 1) / FillLayerCount));
-            local Color = ColorAt(self.FillColor, self.FillGradientColor, LayerAlpha, self.Phase, self.GradientType, self.Gradient);
-
-            Layer.Circle.Visible = Active and not IsSquare;
-            Layer.Square.Visible = Active and IsSquare;
+        local AccentCount = math.clamp(math.floor(SegmentCount * math.clamp(self.SweepSize, 0.04, 0.5)), 3, MaxAccentSegments);
+        for Index, Line in next, self.AccentSegments do
+            local Active = ShouldShow and self.Sweep and Index <= AccentCount;
+            Line.Visible = Active;
 
             if Active then
-                Layer.Circle.Filled = true;
-                Layer.Circle.NumSides = SegmentCount;
-                Layer.Circle.Position = Center;
-                Layer.Circle.Radius = LayerRadius;
-                Layer.Circle.Color = Color;
-                Layer.Circle.Transparency = math.clamp(self.FillTransparency / FillLayerCount, 0, 1);
-
-                Layer.Square.Filled = true;
-                Layer.Square.Position = Center - Vector2.new(LayerRadius, LayerRadius);
-                Layer.Square.Size = Vector2.new(LayerRadius * 2, LayerRadius * 2);
-                Layer.Square.Color = Color;
-                Layer.Square.Transparency = math.clamp(self.FillTransparency / FillLayerCount, 0, 1);
+                local Start = self.Phase;
+                local FromAlpha = Start + ((Index - 1) / SegmentCount);
+                local ToAlpha = Start + (Index / SegmentCount);
+                local EdgeFade = math.sin((Index / AccentCount) * math.pi);
+                SetLine(
+                    Line,
+                    ShapePoint(IsSquare, Center, Radius, FromAlpha),
+                    ShapePoint(IsSquare, Center, Radius, ToAlpha),
+                    self.AccentColor,
+                    Thickness + 0.5,
+                    math.clamp(0.22 + (EdgeFade * 0.62), 0, 1)
+                );
             end;
+        end;
+
+        for Index, Glow in next, self.GlowLayers do
+            local Active = ShouldShow and self.Glow and not IsSquare;
+            Glow.Visible = Active;
+
+            if Active then
+                Glow.Filled = false;
+                Glow.NumSides = SegmentCount;
+                Glow.Position = Center;
+                Glow.Radius = Radius + (Index * 2.5);
+                Glow.Color = self.AccentColor;
+                Glow.Thickness = math.max(Thickness + Index, 1);
+                Glow.Transparency = math.clamp(self.GlowTransparency / Index, 0, 1);
+            end;
+        end;
+
+        FillCircle.Visible = ShouldShow and self.Filled and not IsSquare;
+        FillSquare.Visible = ShouldShow and self.Filled and IsSquare;
+
+        if FillCircle.Visible then
+            FillCircle.Filled = true;
+            FillCircle.NumSides = SegmentCount;
+            FillCircle.Position = Center;
+            FillCircle.Radius = Radius;
+            FillCircle.Color = self.FillColor;
+            FillCircle.Transparency = math.clamp(self.FillTransparency, 0, 1);
+        end;
+
+        if FillSquare.Visible then
+            FillSquare.Filled = true;
+            FillSquare.Position = Center - Vector2.new(Radius, Radius);
+            FillSquare.Size = Vector2.new(Radius * 2, Radius * 2);
+            FillSquare.Color = self.FillColor;
+            FillSquare.Transparency = math.clamp(self.FillTransparency, 0, 1);
         end;
     end;
 
@@ -6099,20 +6132,22 @@ function Library:CreateFovCircle(Info)
             self.Filled = Value == true;
         elseif Property == 'Color' then
             self.Color = Value;
-        elseif Property == 'GradientColor' or Property == 'SecondaryColor' then
-            self.GradientColor = Value;
+        elseif Property == 'AccentColor' or Property == 'GradientColor' or Property == 'SecondaryColor' then
+            self.AccentColor = Value;
         elseif Property == 'FillColor' then
             self.FillColor = Value;
-        elseif Property == 'FillGradientColor' then
-            self.FillGradientColor = Value;
         elseif Property == 'Transparency' then
             self.Transparency = math.clamp(tonumber(Value) or self.Transparency, 0, 1);
         elseif Property == 'FillTransparency' then
             self.FillTransparency = math.clamp(tonumber(Value) or self.FillTransparency, 0, 1);
-        elseif Property == 'Gradient' then
-            self.Gradient = Value == true;
-        elseif Property == 'GradientType' then
-            self.GradientType = tostring(Value or self.GradientType);
+        elseif Property == 'Glow' then
+            self.Glow = Value == true;
+        elseif Property == 'GlowTransparency' then
+            self.GlowTransparency = math.clamp(tonumber(Value) or self.GlowTransparency, 0, 1);
+        elseif Property == 'Sweep' or Property == 'Gradient' then
+            self.Sweep = Value == true;
+        elseif Property == 'SweepSize' then
+            self.SweepSize = math.clamp(tonumber(Value) or self.SweepSize, 0.04, 0.5);
         elseif Property == 'GradientDirection' then
             self.GradientDirection = tostring(Value or self.GradientDirection);
         elseif Property == 'GradientRotation' then

@@ -93,26 +93,26 @@ local FovCircle = Library:CreateFovCircle({
     Shape = 'Circle', -- Circle or Square
     Radius = 120,
     Sides = 64,
-    Color = Color3.new(1, 1, 1),
-    GradientColor = Color3.fromRGB(216, 114, 150),
-    FillColor = Color3.new(1, 1, 1),
-    FillGradientColor = Color3.fromRGB(216, 114, 150),
-    Thickness = 1,
+    Color = Color3.fromRGB(245, 245, 245),
+    AccentColor = Color3.fromRGB(216, 114, 150),
+    FillColor = Color3.fromRGB(245, 245, 245),
+    Thickness = 1.5,
     Filled = false,
-    Gradient = true,
-    GradientType = 'Linear', -- Linear, Radial, Pulse, Rainbow
+    Glow = true,
+    Sweep = true,
+    SweepSize = 0.16,
     GradientDirection = 'Clockwise',
-    GradientSpeed = 0.35,
-    Smoothing = 0.15,
+    GradientSpeed = 0.22,
+    Smoothing = 0.12,
 })
 
 FovCircle:Set('Radius', 180)
 FovCircle:Set('Filled', true)
-FovCircle:Set('GradientType', 'Rainbow')
+FovCircle:Set('Sweep', false)
 FovCircle:SetVisible(false)
 ```
 
-The FOV circle follows the mouse and uses the executor Drawing API. It supports circle and square shapes, polygon side count, outline/fill colors, animated gradients, gradient direction, gradient speed, thickness, fill opacity, and smoothed mouse following.
+The FOV circle follows the mouse and uses the executor Drawing API. It renders a quiet base ring, optional soft fill, optional glow, and a rotating accent sweep. It supports circle and square shapes, polygon side count, outline/fill/accent colors, sweep size and speed, thickness, fill opacity, and smoothed mouse following.
 
 ### Body Selector
 
