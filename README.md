@@ -83,11 +83,33 @@ The ESP preview is a separate attached panel that follows the main window with a
 
 The preview builds a local-player avatar rig, plays an idle animation continuously, and rotates the rig inside the same viewport.
 
+Pass `AvatarScale` to override the default preview rig scale.
+
+### FOV Circle
+
+```lua
+local FovCircle = Library:CreateFovCircle({
+    Visible = true,
+    Shape = 'Circle', -- Circle or Square
+    Radius = 120,
+    Sides = 64,
+    Color = Color3.new(1, 1, 1),
+    FillColor = Color3.new(1, 1, 1),
+    Thickness = 1,
+    Filled = false,
+})
+
+FovCircle:Set('Radius', 180)
+FovCircle:Set('Filled', true)
+FovCircle:SetVisible(false)
+```
+
+The FOV circle follows the mouse and uses the executor Drawing API. It supports circle and square shapes, polygon side count for circles, outline/fill colors, thickness, and fill opacity.
+
 ### Body Selector
 
 ```lua
 Groupbox:AddBodySelector('BodyParts', {
-    Text = 'Body parts',
     Default = { Head = true, Torso = true },
     Callback = function(Value)
         print(Value.Head, Value.Torso)

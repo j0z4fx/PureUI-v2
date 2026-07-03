@@ -42,6 +42,7 @@ local Library = {
     RegistryMap = {};
 
     HudRegistry = {};
+    DrawingObjects = {};
 
     -- Per-gradient shimmer state. A UIGradient is a Roblox Instance, so we can't
     -- hang arbitrary fields (ShimmerColors etc.) on it -- keep them here instead,
@@ -1932,6 +1933,14 @@ function Library:Unload()
      -- Call our unload callback, maybe to undo some hooks etc
     if Library.OnUnload then
         pcall(Library.OnUnload)
+    end
+
+    for Idx = #Library.DrawingObjects, 1, -1 do
+        local DrawingObject = table.remove(Library.DrawingObjects, Idx);
+        pcall(function()
+            DrawingObject.Visible = false;
+            DrawingObject:Remove();
+        end);
     end
 
     pcall(function()
@@ -4199,12 +4208,12 @@ do
         };
 
         local Parts = Info.Parts or {
-            { Key = 'Head', Text = 'Head', Position = UDim2.fromOffset(96, 4), Size = UDim2.fromOffset(28, 28) };
-            { Key = 'Torso', Text = 'Torso', Position = UDim2.fromOffset(78, 34), Size = UDim2.fromOffset(64, 64) };
-            { Key = 'LeftArm', Text = 'L Arm', Position = UDim2.fromOffset(48, 34), Size = UDim2.fromOffset(28, 64) };
-            { Key = 'RightArm', Text = 'R Arm', Position = UDim2.fromOffset(144, 34), Size = UDim2.fromOffset(28, 64) };
-            { Key = 'LeftLeg', Text = 'L Leg', Position = UDim2.fromOffset(78, 100), Size = UDim2.fromOffset(31, 64) };
-            { Key = 'RightLeg', Text = 'R Leg', Position = UDim2.fromOffset(111, 100), Size = UDim2.fromOffset(31, 64) };
+            { Key = 'Head', Text = 'Head', Position = UDim2.fromOffset(94, 4), Size = UDim2.fromOffset(32, 32) };
+            { Key = 'Torso', Text = 'Torso', Position = UDim2.fromOffset(78, 38), Size = UDim2.fromOffset(64, 64) };
+            { Key = 'LeftArm', Text = 'L Arm', Position = UDim2.fromOffset(48, 38), Size = UDim2.fromOffset(28, 64) };
+            { Key = 'RightArm', Text = 'R Arm', Position = UDim2.fromOffset(144, 38), Size = UDim2.fromOffset(28, 64) };
+            { Key = 'LeftLeg', Text = 'L Leg', Position = UDim2.fromOffset(78, 104), Size = UDim2.fromOffset(31, 64) };
+            { Key = 'RightLeg', Text = 'R Leg', Position = UDim2.fromOffset(111, 104), Size = UDim2.fromOffset(31, 64) };
         };
 
         local Buttons = {};
@@ -4228,7 +4237,7 @@ do
         local SelectorOuter = Library:Create('Frame', {
             BackgroundColor3 = Color3.new(0, 0, 0);
             BorderColor3 = Color3.new(0, 0, 0);
-            Size = UDim2.new(1, -4, 0, Info.Height or 174);
+            Size = UDim2.new(1, -4, 0, Info.Height or 178);
             ZIndex = 5;
             Parent = Container;
         });
@@ -4257,7 +4266,7 @@ do
             AnchorPoint = Vector2.new(0.5, 0);
             BackgroundTransparency = 1;
             Position = UDim2.new(0.5, 0, 0, 4);
-            Size = UDim2.fromOffset(220, 168);
+            Size = UDim2.fromOffset(220, 172);
             ZIndex = 7;
             Parent = SelectorInner;
         });
@@ -5881,6 +5890,130 @@ function Library:CreatePlayerList(Info)
     return PlayerList;
 end;
 
+function Library:CreateFovCircle(Info)
+    Info = Info or {};
+
+    local HasDrawing = typeof(Drawing) == 'table' and type(Drawing.new) == 'function';
+    assert(HasDrawing, 'CreateFovCircle: Drawing API is not available.');
+
+    local Fov = {
+        Visible = Info.Visible ~= false;
+        Enabled = Info.Enabled ~= false;
+        Shape = Info.Shape or 'Circle';
+        Radius = Info.Radius or 120;
+        Sides = Info.Sides or 64;
+        Thickness = Info.Thickness or 1;
+        Filled = Info.Filled == true;
+        Color = Info.Color or Color3.new(1, 1, 1);
+        FillColor = Info.FillColor or Info.Color or Color3.new(1, 1, 1);
+        Transparency = Info.Transparency or 1;
+        FillTransparency = Info.FillTransparency or 0.18;
+        Drawings = {};
+    };
+
+    local FillCircle = Drawing.new('Circle');
+    local StrokeCircle = Drawing.new('Circle');
+    local FillSquare = Drawing.new('Square');
+    local StrokeSquare = Drawing.new('Square');
+
+    Fov.Drawings = { FillCircle, StrokeCircle, FillSquare, StrokeSquare };
+    for _, DrawingObject in next, Fov.Drawings do
+        table.insert(Library.DrawingObjects, DrawingObject);
+    end;
+
+    local function ApplyCircle(DrawingObject, Filled)
+        DrawingObject.Filled = Filled;
+        DrawingObject.NumSides = math.clamp(math.floor(Fov.Sides), 3, 128);
+        DrawingObject.Radius = math.max(Fov.Radius, 1);
+        DrawingObject.Thickness = math.max(Fov.Thickness, 1);
+    end;
+
+    local function ApplySquare(DrawingObject, Filled)
+        DrawingObject.Filled = Filled;
+        DrawingObject.Size = Vector2.new(Fov.Radius * 2, Fov.Radius * 2);
+        DrawingObject.Thickness = math.max(Fov.Thickness, 1);
+    end;
+
+    function Fov:Update()
+        local MousePosition = InputService:GetMouseLocation();
+        local IsSquare = tostring(self.Shape):lower() == 'square';
+        local ShouldShow = self.Enabled and self.Visible;
+        local FillVisible = ShouldShow and self.Filled;
+
+        FillCircle.Visible = FillVisible and not IsSquare;
+        StrokeCircle.Visible = ShouldShow and not IsSquare;
+        FillSquare.Visible = FillVisible and IsSquare;
+        StrokeSquare.Visible = ShouldShow and IsSquare;
+
+        ApplyCircle(FillCircle, true);
+        ApplyCircle(StrokeCircle, false);
+        ApplySquare(FillSquare, true);
+        ApplySquare(StrokeSquare, false);
+
+        FillCircle.Position = MousePosition;
+        StrokeCircle.Position = MousePosition;
+        FillSquare.Position = MousePosition - Vector2.new(self.Radius, self.Radius);
+        StrokeSquare.Position = MousePosition - Vector2.new(self.Radius, self.Radius);
+
+        FillCircle.Color = self.FillColor;
+        FillSquare.Color = self.FillColor;
+        StrokeCircle.Color = self.Color;
+        StrokeSquare.Color = self.Color;
+
+        FillCircle.Transparency = math.clamp(self.FillTransparency, 0, 1);
+        FillSquare.Transparency = math.clamp(self.FillTransparency, 0, 1);
+        StrokeCircle.Transparency = math.clamp(self.Transparency, 0, 1);
+        StrokeSquare.Transparency = math.clamp(self.Transparency, 0, 1);
+    end;
+
+    function Fov:SetVisible(Value)
+        self.Visible = Value == true;
+        self:Update();
+    end;
+
+    function Fov:Set(Property, Value)
+        if Property == 'Shape' then
+            self.Shape = tostring(Value or 'Circle');
+        elseif Property == 'Radius' then
+            self.Radius = math.max(tonumber(Value) or self.Radius, 1);
+        elseif Property == 'Sides' then
+            self.Sides = math.clamp(math.floor(tonumber(Value) or self.Sides), 3, 128);
+        elseif Property == 'Thickness' then
+            self.Thickness = math.max(tonumber(Value) or self.Thickness, 1);
+        elseif Property == 'Filled' then
+            self.Filled = Value == true;
+        elseif Property == 'Color' then
+            self.Color = Value;
+        elseif Property == 'FillColor' then
+            self.FillColor = Value;
+        elseif Property == 'Transparency' then
+            self.Transparency = math.clamp(tonumber(Value) or self.Transparency, 0, 1);
+        elseif Property == 'FillTransparency' then
+            self.FillTransparency = math.clamp(tonumber(Value) or self.FillTransparency, 0, 1);
+        elseif Property == 'Enabled' then
+            self.Enabled = Value == true;
+        end;
+
+        self:Update();
+    end;
+
+    function Fov:Destroy()
+        for _, DrawingObject in next, self.Drawings do
+            pcall(function()
+                DrawingObject.Visible = false;
+                DrawingObject:Remove();
+            end);
+        end;
+    end;
+
+    Library:GiveSignal(RenderStepped:Connect(function()
+        Fov:Update();
+    end));
+
+    Fov:Update();
+    return Fov;
+end;
+
 function Library:CreateEspPreview(Info)
     Info = Info or {};
     local Window = Info.Window;
@@ -6062,7 +6195,7 @@ function Library:CreateEspPreview(Info)
         StripClone(Clone);
         Clone.Parent = World;
         pcall(function()
-            Clone:ScaleTo(Info.AvatarScale or 0.9);
+            Clone:ScaleTo(Info.AvatarScale or 0.72);
         end);
         PlayIdle(Clone);
 
