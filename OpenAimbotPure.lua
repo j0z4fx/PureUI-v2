@@ -633,9 +633,11 @@ local EspPreview = Window:AddEspPreview({
     Title = 'ESP Preview',
     AvatarScale = 0.58,
 })
-EspPreview:SetEspConfigProvider(function()
-    return Config
-end)
+if type(EspPreview.SetEspConfigProvider) == 'function' then
+    EspPreview:SetEspConfigProvider(function()
+        return Config
+    end)
+end
 
 local Tabs = {
     Aimbot = Window:AddTab('Aimbot'),
