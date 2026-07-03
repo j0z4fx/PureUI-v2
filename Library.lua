@@ -6531,12 +6531,212 @@ function Library:CreateEspPreview(Info)
         BackgroundColor3 = 'BackgroundColor';
     }, true);
 
+    local EspOverlay = Library:Create('Frame', {
+        BackgroundTransparency = 1;
+        ClipsDescendants = true;
+        Position = UDim2.new(0, 1, 0, 1);
+        Size = UDim2.new(1, -2, 1, -2);
+        ZIndex = 76;
+        Parent = ViewOuter;
+    });
+
+    local EspBox = Library:Create('Frame', {
+        BackgroundTransparency = 1;
+        BorderSizePixel = 0;
+        Visible = false;
+        ZIndex = 77;
+        Parent = EspOverlay;
+    });
+
+    local EspBoxStroke = Library:Create('UIStroke', {
+        ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
+        Color = Library.AccentColor;
+        Thickness = 1;
+        Transparency = 0;
+        Parent = EspBox;
+    });
+
+    local EspName = Library:CreateLabel({
+        AnchorPoint = Vector2.new(0.5, 1);
+        BackgroundTransparency = 1;
+        Size = UDim2.fromOffset(150, 18);
+        Text = LocalPlayer.Name;
+        TextSize = 13;
+        TextStrokeTransparency = 0;
+        Visible = false;
+        ZIndex = 78;
+        Parent = EspOverlay;
+    }, true);
+
+    local EspHealth = Library:CreateLabel({
+        AnchorPoint = Vector2.new(0.5, 0);
+        BackgroundTransparency = 1;
+        Size = UDim2.fromOffset(150, 18);
+        Text = '100/100';
+        TextSize = 13;
+        TextStrokeTransparency = 0;
+        Visible = false;
+        ZIndex = 78;
+        Parent = EspOverlay;
+    }, true);
+
+    local EspTracer = Library:Create('Frame', {
+        AnchorPoint = Vector2.new(0.5, 0.5);
+        BackgroundColor3 = Library.AccentColor;
+        BorderSizePixel = 0;
+        Visible = false;
+        ZIndex = 77;
+        Parent = EspOverlay;
+    });
+
     local Camera = Instance.new('Camera');
     Camera.Parent = Viewport;
     Viewport.CurrentCamera = Camera;
 
     local World = Instance.new('WorldModel');
     World.Parent = Viewport;
+
+    local function GetPreviewEspConfig()
+        if type(Preview.EspConfigProvider) == 'function' then
+            local Ok, Config = pcall(Preview.EspConfigProvider);
+            if Ok and type(Config) == 'table' then
+                return Config;
+            end;
+        end;
+
+        return type(Preview.EspConfig) == 'table' and Preview.EspConfig or {};
+    end;
+
+    local function SetPreviewEspVisible(Visible)
+        EspBox.Visible = Visible and EspBox.Visible or false;
+        EspName.Visible = Visible and EspName.Visible or false;
+        EspHealth.Visible = Visible and EspHealth.Visible or false;
+        EspTracer.Visible = Visible and EspTracer.Visible or false;
+    end;
+
+    local function ProjectViewportPoint(WorldPosition)
+        local Size = Viewport.AbsoluteSize;
+        if Size.X <= 0 or Size.Y <= 0 then
+            return nil;
+        end;
+
+        local Relative = Camera.CFrame:PointToObjectSpace(WorldPosition);
+        if Relative.Z >= -0.05 then
+            return nil;
+        end;
+
+        local Focal = 1 / math.tan(math.rad(Camera.FieldOfView) / 2);
+        local Aspect = Size.X / math.max(Size.Y, 1);
+        local X = (Relative.X / -Relative.Z) * Focal / Aspect;
+        local Y = (Relative.Y / -Relative.Z) * Focal;
+
+        return Vector2.new((X + 1) * 0.5 * Size.X, (1 - Y) * 0.5 * Size.Y);
+    end;
+
+    local function GetModelScreenBounds(Model)
+        local BoxCFrame, BoxSize = Model:GetBoundingBox();
+        local Half = BoxSize / 2;
+        local Min = Vector2.new(math.huge, math.huge);
+        local Max = Vector2.new(-math.huge, -math.huge);
+        local AnyProjected = false;
+
+        for _, X in next, { -1, 1 } do
+            for _, Y in next, { -1, 1 } do
+                for _, Z in next, { -1, 1 } do
+                    local Point = ProjectViewportPoint((BoxCFrame * CFrame.new(Half.X * X, Half.Y * Y, Half.Z * Z)).Position);
+
+                    if Point then
+                        AnyProjected = true;
+                        Min = Vector2.new(math.min(Min.X, Point.X), math.min(Min.Y, Point.Y));
+                        Max = Vector2.new(math.max(Max.X, Point.X), math.max(Max.Y, Point.Y));
+                    end;
+                end;
+            end;
+        end;
+
+        if not AnyProjected then
+            return nil;
+        end;
+
+        local ViewSize = Viewport.AbsoluteSize;
+        Min = Vector2.new(math.clamp(Min.X, 0, ViewSize.X), math.clamp(Min.Y, 0, ViewSize.Y));
+        Max = Vector2.new(math.clamp(Max.X, 0, ViewSize.X), math.clamp(Max.Y, 0, ViewSize.Y));
+
+        if Max.X - Min.X < 2 or Max.Y - Min.Y < 2 then
+            return nil;
+        end;
+
+        return Min, Max;
+    end;
+
+    local function PositionLine(Line, From, To, Thickness)
+        local Delta = To - From;
+        local Length = Delta.Magnitude;
+
+        if Length <= 1 then
+            Line.Visible = false;
+            return false;
+        end;
+
+        Line.Position = UDim2.fromOffset((From.X + To.X) / 2, (From.Y + To.Y) / 2);
+        Line.Size = UDim2.fromOffset(Length, math.max(Thickness, 1));
+        Line.Rotation = math.deg(math.atan2(Delta.Y, Delta.X));
+        return true;
+    end;
+
+    local function UpdatePreviewEsp()
+        if not CurrentClone or not PreviewOuter.Visible then
+            SetPreviewEspVisible(false);
+            return;
+        end;
+
+        local Config = GetPreviewEspConfig();
+        if Config.ESP == false then
+            SetPreviewEspVisible(false);
+            return;
+        end;
+
+        local Min, Max = GetModelScreenBounds(CurrentClone);
+        if not Min or not Max then
+            SetPreviewEspVisible(false);
+            return;
+        end;
+
+        local Color = Config.ESPColour or Config.Color or Config.AccentColor or Library.AccentColor;
+        local Opacity = math.clamp(tonumber(Config.ESPOpacity) or 0.8, 0, 1);
+        local Thickness = math.max(tonumber(Config.ESPThickness) or 1, 1);
+        local Position = Min;
+        local Size = Max - Min;
+        local CenterX = Position.X + (Size.X / 2);
+
+        EspBox.Position = UDim2.fromOffset(Position.X, Position.Y);
+        EspBox.Size = UDim2.fromOffset(Size.X, Size.Y);
+        EspBox.BackgroundColor3 = Color;
+        EspBox.BackgroundTransparency = Config.ESPBoxFilled and (1 - math.min(Opacity, 0.45)) or 1;
+        EspBoxStroke.Color = Color;
+        EspBoxStroke.Thickness = Thickness;
+        EspBoxStroke.Transparency = 1 - Opacity;
+        EspBox.Visible = Config.ESPBox ~= false;
+
+        EspName.Position = UDim2.fromOffset(CenterX, Position.Y - 2);
+        EspName.Text = LocalPlayer.Name;
+        EspName.TextColor3 = Color;
+        EspName.TextTransparency = 1 - Opacity;
+        EspName.TextStrokeTransparency = 0;
+        EspName.Visible = Config.NameESP == true;
+
+        EspHealth.Position = UDim2.fromOffset(CenterX, Position.Y + Size.Y + 2);
+        EspHealth.Text = '100/100';
+        EspHealth.TextColor3 = Color;
+        EspHealth.TextTransparency = 1 - Opacity;
+        EspHealth.TextStrokeTransparency = 0;
+        EspHealth.Visible = Config.HealthESP == true;
+
+        EspTracer.BackgroundColor3 = Color;
+        EspTracer.BackgroundTransparency = 1 - Opacity;
+        local HasTracerLine = PositionLine(EspTracer, Vector2.new(Viewport.AbsoluteSize.X / 2, Viewport.AbsoluteSize.Y), Vector2.new(CenterX, Position.Y + Size.Y), Thickness);
+        EspTracer.Visible = Config.TracerESP == true and HasTracerLine == true;
+    end;
 
     local function GetTargetPosition(Hidden)
         local ViewportSize = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1920, 1080);
@@ -6665,6 +6865,17 @@ function Library:CreateEspPreview(Info)
         UpdateAttachment();
     end;
 
+    function Preview:SetEspConfig(Config)
+        self.EspConfig = Config;
+        self.EspConfigProvider = nil;
+        UpdatePreviewEsp();
+    end;
+
+    function Preview:SetEspConfigProvider(Provider)
+        self.EspConfigProvider = Provider;
+        UpdatePreviewEsp();
+    end;
+
     function Preview:Destroy()
         for _, Connection in next, self.Connections do
             pcall(function()
@@ -6695,6 +6906,8 @@ function Library:CreateEspPreview(Info)
             Angle = (Angle + (Delta * 0.7)) % (math.pi * 2);
             CurrentClone:PivotTo(CFrame.new(0, CloneHeight / 2, 0) * CFrame.Angles(0, Angle, 0));
         end;
+
+        UpdatePreviewEsp();
     end));
 
     for _, Connection in next, Preview.Connections do

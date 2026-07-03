@@ -28,6 +28,7 @@ local Config = {
     AimKey = 'MB2',
     OffAimbotAfterKill = false,
     AimPart = 'HumanoidRootPart',
+    AimParts = { Torso = true },
 
     UseOffset = false,
     OffsetType = 'Static',
@@ -45,13 +46,21 @@ local Config = {
     TriggerKey = 'E',
     TriggerBotChance = 100,
     SmartTriggerBot = true,
+    TriggerFoV = false,
+    TriggerFoVCheck = false,
+    TriggerFoVRadius = 80,
+    TriggerFoVThickness = 1.5,
+    TriggerFoVColour = Color3.fromRGB(245, 245, 245),
+    TriggerFoVAccent = Color3.fromRGB(120, 170, 255),
+    TriggerFoVGlow = true,
 
     AliveCheck = true,
-    GodCheck = true,
     TeamCheck = false,
     FriendCheck = false,
     WallCheck = false,
-    WaterCheck = false,
+    ForceFieldCheck = true,
+    KOCheck = true,
+    HeldCheck = true,
     FoVCheck = true,
     FoVRadius = 120,
     MagnitudeCheck = false,
@@ -106,6 +115,117 @@ local function getPart(character, name)
     return character and character:FindFirstChild(name)
 end
 
+local AimPartOrder = { 'Head', 'Torso', 'LeftArm', 'RightArm', 'LeftLeg', 'RightLeg' }
+local AimPartMap = {
+    Head = { 'Head' },
+    Torso = { 'HumanoidRootPart', 'UpperTorso', 'Torso', 'LowerTorso' },
+    LeftArm = { 'LeftHand', 'LeftLowerArm', 'LeftUpperArm', 'Left Arm', 'LeftArm' },
+    RightArm = { 'RightHand', 'RightLowerArm', 'RightUpperArm', 'Right Arm', 'RightArm' },
+    LeftLeg = { 'LeftFoot', 'LeftLowerLeg', 'LeftUpperLeg', 'Left Leg', 'LeftLeg' },
+    RightLeg = { 'RightFoot', 'RightLowerLeg', 'RightUpperLeg', 'Right Leg', 'RightLeg' },
+}
+
+local function getOriginPart(character)
+    return getPart(character, 'HumanoidRootPart')
+        or getPart(character, 'UpperTorso')
+        or getPart(character, 'Torso')
+        or getPart(character, 'Head')
+end
+
+local function normalizeAimParts(value)
+    local normalized = {}
+
+    if type(value) == 'table' then
+        for key, enabled in pairs(value) do
+            if type(key) == 'number' then
+                normalized[tostring(enabled)] = true
+            elseif enabled then
+                normalized[tostring(key)] = true
+            end
+        end
+    end
+
+    if next(normalized) == nil then
+        normalized.Torso = true
+    end
+
+    Config.AimParts = normalized
+
+    for _, key in ipairs(AimPartOrder) do
+        if normalized[key] then
+            Config.AimPart = key
+            return normalized
+        end
+    end
+
+    Config.AimPart = 'Torso'
+    return normalized
+end
+
+local function getAimCandidates(character)
+    local candidates = {}
+    normalizeAimParts(Config.AimParts)
+
+    for _, key in ipairs(AimPartOrder) do
+        if Config.AimParts[key] then
+            for _, partName in ipairs(AimPartMap[key] or { key }) do
+                local part = getPart(character, partName)
+                if part and part:IsA('BasePart') then
+                    table.insert(candidates, part)
+                    break
+                end
+            end
+        end
+    end
+
+    if #candidates == 0 then
+        local fallback = getOriginPart(character)
+        if fallback then
+            table.insert(candidates, fallback)
+        end
+    end
+
+    return candidates
+end
+
+local function chooseAimPart(character)
+    local candidates = getAimCandidates(character)
+    local mousePosition = UserInputService:GetMouseLocation()
+    local bestPart
+    local bestDistance = math.huge
+
+    for _, part in ipairs(candidates) do
+        local viewportPosition, inViewport = Camera:WorldToViewportPoint(part.Position)
+        local screenDistance = inViewport and (Vector2.new(viewportPosition.X, viewportPosition.Y) - mousePosition).Magnitude or math.huge
+
+        if screenDistance < bestDistance then
+            bestDistance = screenDistance
+            bestPart = part
+        end
+    end
+
+    return bestPart or candidates[1]
+end
+
+local function getBodyEffectActive(character, name)
+    local effects = character and character:FindFirstChild('BodyEffects')
+    local value = effects and effects:FindFirstChild(name)
+
+    if not value then
+        return false
+    elseif value:IsA('BoolValue') then
+        return value.Value == true
+    elseif value:IsA('ObjectValue') then
+        return value.Value ~= nil
+    elseif value:IsA('StringValue') then
+        return value.Value ~= ''
+    elseif value:IsA('NumberValue') or value:IsA('IntValue') then
+        return value.Value ~= 0
+    end
+
+    return false
+end
+
 local function resetAimbot(saveAiming, saveTarget)
     Aiming = saveAiming and Aiming or false
     Target = saveTarget and Target or nil
@@ -132,7 +252,15 @@ local function targetAllowed(player, character, targetPart)
         return false
     end
 
-    if Config.GodCheck and (humanoid.Health >= 10 ^ 36 or character:FindFirstChildOfClass('ForceField')) then
+    if Config.ForceFieldCheck and character:FindFirstChildOfClass('ForceField') then
+        return false
+    end
+
+    if Config.KOCheck and getBodyEffectActive(character, 'K.O') then
+        return false
+    end
+
+    if Config.HeldCheck and getBodyEffectActive(character, 'Grabbed') then
         return false
     end
 
@@ -160,19 +288,19 @@ local function targetAllowed(player, character, targetPart)
     end
 
     if Config.MagnitudeCheck then
-        local nativePart = getPart(localCharacter(), Config.AimPart)
+        local nativePart = getOriginPart(localCharacter())
         if nativePart and (targetPart.Position - nativePart.Position).Magnitude > Config.TriggerMagnitude then
             return false
         end
     end
 
     if Config.WallCheck then
-        local nativePart = getPart(localCharacter(), Config.AimPart)
+        local nativePart = getOriginPart(localCharacter())
         if nativePart then
             local params = RaycastParams.new()
             params.FilterType = Enum.RaycastFilterType.Exclude
             params.FilterDescendantsInstances = { localCharacter() }
-            params.IgnoreWater = not Config.WaterCheck
+            params.IgnoreWater = true
 
             local direction = targetPart.Position - nativePart.Position
             local result = workspace:Raycast(nativePart.Position, direction, params)
@@ -187,8 +315,8 @@ end
 
 local function resolveTarget(character)
     local localChar = localCharacter()
-    local nativePart = getPart(localChar, Config.AimPart)
-    local targetPart = getPart(character, Config.AimPart)
+    local nativePart = getOriginPart(localChar)
+    local targetPart = chooseAimPart(character)
     local humanoid = character and character:FindFirstChildOfClass('Humanoid')
     local player = Players:GetPlayerFromCharacter(character)
 
@@ -286,6 +414,18 @@ local FovCircle = Library:CreateFovCircle({
     Smoothing = Config.FoVSmoothing,
 })
 
+local TriggerFovCircle = Library:CreateFovCircle({
+    Visible = false,
+    Radius = Config.TriggerFoVRadius,
+    Sides = 72,
+    Color = Config.TriggerFoVColour,
+    AccentColor = Config.TriggerFoVAccent,
+    Thickness = Config.TriggerFoVThickness,
+    Filled = false,
+    Glow = Config.TriggerFoVGlow,
+    Smoothing = Config.FoVSmoothing,
+})
+
 local function newDrawing(kind)
     if not (getfenv().Drawing and getfenv().Drawing.new) then
         return nil
@@ -338,6 +478,45 @@ local function getEsp(player)
     return set
 end
 
+local function isGuiVisible(gui)
+    local current = gui
+
+    while current and current ~= Library.ScreenGui do
+        if current:IsA('GuiObject') and not current.Visible then
+            return false
+        end
+
+        current = current.Parent
+    end
+
+    return true
+end
+
+local function rectsOverlap(aPosition, aSize, bPosition, bSize)
+    return aPosition.X < bPosition.X + bSize.X
+        and aPosition.X + aSize.X > bPosition.X
+        and aPosition.Y < bPosition.Y + bSize.Y
+        and aPosition.Y + aSize.Y > bPosition.Y
+end
+
+local function espOverlapsPureUi(position, size)
+    local screenGui = Library.ScreenGui
+    if not screenGui then
+        return false
+    end
+
+    for _, gui in ipairs(screenGui:GetDescendants()) do
+        if gui:IsA('GuiObject') and isGuiVisible(gui) then
+            local guiSize = gui.AbsoluteSize
+            if guiSize.X > 0 and guiSize.Y > 0 and rectsOverlap(position, size, gui.AbsolutePosition, guiSize) then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
 local function updateEsp()
     if not (getfenv().Drawing and getfenv().Drawing.new) then
         return
@@ -363,9 +542,16 @@ local function updateEsp()
                     local height = math.abs(headPos.Y - bottomPos.Y)
                     local width = math.clamp(2350 / math.max(rootPos.Z, 1), 12, 400)
                     local color = Config.ESPUseTeamColour and player.TeamColor.Color or Config.ESPColour
+                    local boxPosition = Vector2.new(rootPos.X - width / 2, rootPos.Y - height / 2)
+                    local occupiedPosition = boxPosition - Vector2.new(0, 18)
+                    local occupiedSize = Vector2.new(width, height + 40)
 
-                    if set.Box then
-                        set.Box.Position = Vector2.new(rootPos.X - width / 2, rootPos.Y - height / 2)
+                    if espOverlapsPureUi(occupiedPosition, occupiedSize) then
+                        show = false
+                    end
+
+                    if show and set.Box then
+                        set.Box.Position = boxPosition
                         set.Box.Size = Vector2.new(width, height)
                         set.Box.Thickness = Config.ESPThickness
                         set.Box.Transparency = Config.ESPOpacity
@@ -374,7 +560,7 @@ local function updateEsp()
                         set.Box.Visible = Config.ESPBox
                     end
 
-                    if set.Name then
+                    if show and set.Name then
                         set.Name.Text = player.Name
                         set.Name.Position = Vector2.new(rootPos.X, rootPos.Y - height / 2 - 14)
                         set.Name.Color = color
@@ -382,7 +568,7 @@ local function updateEsp()
                         set.Name.Visible = Config.NameESP
                     end
 
-                    if set.Health then
+                    if show and set.Health then
                         set.Health.Text = ('%d/%d'):format(math.floor(humanoid.Health), math.floor(humanoid.MaxHealth))
                         set.Health.Position = Vector2.new(rootPos.X, rootPos.Y + height / 2 + 2)
                         set.Health.Color = color
@@ -390,7 +576,7 @@ local function updateEsp()
                         set.Health.Visible = Config.HealthESP
                     end
 
-                    if set.Tracer then
+                    if show and set.Tracer then
                         set.Tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
                         set.Tracer.To = Vector2.new(rootPos.X, rootPos.Y + height / 2)
                         set.Tracer.Thickness = Config.ESPThickness
@@ -414,6 +600,19 @@ local function setDrawingFovVisible(value)
     FovCircle:SetVisible(value and Config.FoV)
 end
 
+local function setTriggerFovVisible(value)
+    TriggerFovCircle:SetVisible(value and Config.TriggerFoV and Config.TriggerBot)
+end
+
+local function targetInsideTriggerFov(viewportPosition)
+    if not Config.TriggerFoVCheck then
+        return true
+    end
+
+    local mousePosition = UserInputService:GetMouseLocation()
+    return (Vector2.new(viewportPosition.X, viewportPosition.Y) - mousePosition).Magnitude <= Config.TriggerFoVRadius
+end
+
 local Window = Library:CreateWindow({
     Title = 'Pure Open Aimbot',
     Center = true,
@@ -434,6 +633,9 @@ local EspPreview = Window:AddEspPreview({
     Title = 'ESP Preview',
     AvatarScale = 0.58,
 })
+EspPreview:SetEspConfigProvider(function()
+    return Config
+end)
 
 local Tabs = {
     Aimbot = Window:AddTab('Aimbot'),
@@ -546,8 +748,8 @@ local AimbotTabbox = Tabs.Aimbot:AddLeftTabbox('Open Aimbot')
 local AimBox = AimbotTabbox:AddTab('Aim')
 local MovementBox = AimbotTabbox:AddTab('Motion')
 local ChecksBox = AimbotTabbox:AddTab('Checks')
-local TriggerBox = AimbotTabbox:AddTab('Trigger')
 local FovBox = AimbotTabbox:AddTab('FOV')
+local TriggerBox = Tabs.Aimbot:AddRightGroupbox('Triggerbot')
 
 local AimbotToggle = AimBox:AddToggle('OA_Aimbot', {
     Text = 'Aimbot',
@@ -574,11 +776,12 @@ AimBox:AddDropdown('OA_AimMode', {
     Default = Config.AimMode,
     Callback = function(value) Config.AimMode = value end,
 })
-AimBox:AddDropdown('OA_AimPart', {
-    Text = 'Aim part',
-    Values = { 'Head', 'HumanoidRootPart', 'UpperTorso', 'Torso' },
-    Default = Config.AimPart,
-    Callback = function(value) Config.AimPart = value end,
+AimBox:AddBodySelector('OA_AimParts', {
+    Default = Config.AimParts,
+    Height = 186,
+    Callback = function(value)
+        normalizeAimParts(value)
+    end,
 })
 
 MovementBox:AddToggle('OA_UseSensitivity', {
@@ -641,6 +844,7 @@ local TriggerToggle = TriggerBox:AddToggle('OA_TriggerBot', {
     Callback = function(value)
         Config.TriggerBot = value
         if not value then Triggering = false end
+        setTriggerFovVisible(Config.TriggerFoV)
     end,
 })
 TriggerToggle:AddKeyPicker('OA_TriggerKey', {
@@ -662,13 +866,65 @@ TriggerBox:AddSlider('OA_TriggerChance', {
     Rounding = 0,
     Callback = function(value) Config.TriggerBotChance = value end,
 })
+TriggerBox:AddToggle('OA_TriggerFovCheck', {
+    Text = 'FOV check',
+    Default = Config.TriggerFoVCheck,
+    Callback = function(value) Config.TriggerFoVCheck = value end,
+})
+TriggerBox:AddToggle('OA_TriggerFovVisible', {
+    Text = 'Show FOV',
+    Default = Config.TriggerFoV,
+    Callback = function(value)
+        Config.TriggerFoV = value
+        setTriggerFovVisible(value)
+    end,
+})
+TriggerBox:AddSlider('OA_TriggerFovRadius', {
+    Text = 'FOV radius',
+    Default = Config.TriggerFoVRadius,
+    Min = 20,
+    Max = 500,
+    Rounding = 0,
+    Callback = function(value)
+        Config.TriggerFoVRadius = value
+        TriggerFovCircle:Set('Radius', value)
+    end,
+})
+TriggerBox:AddSlider('OA_TriggerFovThickness', {
+    Text = 'FOV thickness',
+    Default = Config.TriggerFoVThickness,
+    Min = 1,
+    Max = 5,
+    Rounding = 1,
+    Callback = function(value)
+        Config.TriggerFoVThickness = value
+        TriggerFovCircle:Set('Thickness', value)
+    end,
+})
+TriggerBox:AddLabel('FOV color'):AddColorPicker('OA_TriggerFovColor', {
+    Default = Config.TriggerFoVColour,
+    Title = 'Trigger FOV color',
+    Callback = function(value)
+        Config.TriggerFoVColour = value
+        TriggerFovCircle:Set('Color', value)
+    end,
+})
+TriggerBox:AddLabel('FOV accent'):AddColorPicker('OA_TriggerFovAccent', {
+    Default = Config.TriggerFoVAccent,
+    Title = 'Trigger FOV accent',
+    Callback = function(value)
+        Config.TriggerFoVAccent = value
+        TriggerFovCircle:Set('AccentColor', value)
+    end,
+})
 
 ChecksBox:AddToggle('OA_AliveCheck', { Text = 'Alive check', Default = Config.AliveCheck, Callback = function(value) Config.AliveCheck = value end })
-ChecksBox:AddToggle('OA_GodCheck', { Text = 'God check', Default = Config.GodCheck, Callback = function(value) Config.GodCheck = value end })
 ChecksBox:AddToggle('OA_TeamCheck', { Text = 'Team check', Default = Config.TeamCheck, Callback = function(value) Config.TeamCheck = value end })
 ChecksBox:AddToggle('OA_FriendCheck', { Text = 'Friend check', Default = Config.FriendCheck, Callback = function(value) Config.FriendCheck = value end })
 ChecksBox:AddToggle('OA_WallCheck', { Text = 'Wall check', Default = Config.WallCheck, Callback = function(value) Config.WallCheck = value end })
-ChecksBox:AddToggle('OA_WaterCheck', { Text = 'Ignore water', Default = Config.WaterCheck, Callback = function(value) Config.WaterCheck = value end })
+ChecksBox:AddToggle('OA_ForceFieldCheck', { Text = 'ForceField check', Default = Config.ForceFieldCheck, Callback = function(value) Config.ForceFieldCheck = value end })
+ChecksBox:AddToggle('OA_KOCheck', { Text = 'K.O. check', Default = Config.KOCheck, Callback = function(value) Config.KOCheck = value end })
+ChecksBox:AddToggle('OA_HeldCheck', { Text = 'Held check', Default = Config.HeldCheck, Callback = function(value) Config.HeldCheck = value end })
 ChecksBox:AddToggle('OA_FovCheck', { Text = 'FOV check', Default = Config.FoVCheck, Callback = function(value) Config.FoVCheck = value end })
 ChecksBox:AddSlider('OA_FovRadiusCheck', {
     Text = 'FOV radius',
@@ -828,6 +1084,7 @@ table.insert(Connections, RunService.RenderStepped:Connect(function()
     end
 
     setDrawingFovVisible(Config.FoV)
+    setTriggerFovVisible(Config.TriggerFoV)
     updateEsp()
 
     local nextAiming = Config.Aimbot and Options.OA_AimKey and Options.OA_AimKey:GetState() or false
@@ -840,7 +1097,8 @@ table.insert(Connections, RunService.RenderStepped:Connect(function()
 
     if Config.TriggerBot and Triggering and (not Config.SmartTriggerBot or Aiming) and getfenv().mouse1click and Mouse.Target then
         local model = Mouse.Target:FindFirstAncestorOfClass('Model')
-        if model and select(1, resolveTarget(model)) and chance(Config.TriggerBotChance) then
+        local ok, _, viewportPosition = resolveTarget(model)
+        if model and ok and targetInsideTriggerFov(viewportPosition) and chance(Config.TriggerBotChance) then
             getfenv().mouse1click()
         end
     end
@@ -878,6 +1136,7 @@ end))
 Library:OnUnload(function()
     resetAimbot()
     FovCircle:Destroy()
+    TriggerFovCircle:Destroy()
     clearEsp()
     pcall(function()
         TargetInfo:Destroy()
