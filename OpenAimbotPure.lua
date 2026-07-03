@@ -2,7 +2,7 @@
 -- Based on ttwizz/Open-Aimbot (MIT): https://github.com/ttwizz/Open-Aimbot
 -- This keeps the core target/check/visual behavior and replaces the original Fluent UI with PureUI.
 
-local repo = 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/0561766e15b3dcf85031187e7a4fa4843df64b19/'
+local repo = 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/0561766618d8aa4842f824200df59f64b1c601fb/'
 local cacheBust = '?v=' .. tostring(os.time())
 
 local Library = loadstring(game:HttpGet(repo .. 'Library.lua' .. cacheBust))()
@@ -224,6 +224,17 @@ local function getBodyEffectActive(character, name)
     end
 
     return false
+end
+
+local function getArmorValue(character)
+    local effects = character and character:FindFirstChild('BodyEffects')
+    local armor = effects and effects:FindFirstChild('Armor')
+
+    if armor and (armor:IsA('NumberValue') or armor:IsA('IntValue')) then
+        return math.max(tonumber(armor.Value) or 0, 0)
+    end
+
+    return 0
 end
 
 local function resetAimbot(saveAiming, saveTarget)
@@ -622,6 +633,8 @@ local Window = Library:CreateWindow({
 
 local TargetInfo = Library:CreateTargetInfo({
     Player = LocalPlayer,
+    Armor = getArmorValue(LocalPlayer.Character),
+    ArmorMax = 200,
 })
 
 local PlayerList = Library:CreatePlayerList({
@@ -689,6 +702,9 @@ local function updateTargetInfo()
         LastTargetInfoPlayer = player
         TargetInfo:SetPlayer(player)
     end
+
+    TargetInfo.ArmorMax = 200
+    TargetInfo:SetArmor(getArmorValue(player.Character))
 end
 
 PlayerList:AddButton({
