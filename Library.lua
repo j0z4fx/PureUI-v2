@@ -5896,6 +5896,10 @@ function Library:CreateFovCircle(Info)
     local HasDrawing = typeof(Drawing) == 'table' and type(Drawing.new) == 'function';
     assert(HasDrawing, 'CreateFovCircle: Drawing API is not available.');
 
+    local MaxSegments = 128;
+    local FillLayerCount = 12;
+    local MousePosition = InputService:GetMouseLocation();
+
     local Fov = {
         Visible = Info.Visible ~= false;
         Enabled = Info.Enabled ~= false;
@@ -5905,65 +5909,176 @@ function Library:CreateFovCircle(Info)
         Thickness = Info.Thickness or 1;
         Filled = Info.Filled == true;
         Color = Info.Color or Color3.new(1, 1, 1);
+        GradientColor = Info.GradientColor or Info.SecondaryColor or Color3.fromRGB(216, 114, 150);
         FillColor = Info.FillColor or Info.Color or Color3.new(1, 1, 1);
+        FillGradientColor = Info.FillGradientColor or Info.GradientColor or Info.SecondaryColor or Color3.fromRGB(216, 114, 150);
         Transparency = Info.Transparency or 1;
         FillTransparency = Info.FillTransparency or 0.18;
+        Gradient = Info.Gradient == true;
+        GradientType = Info.GradientType or 'Linear';
+        GradientDirection = Info.GradientDirection or 'Clockwise';
+        GradientRotation = Info.GradientRotation ~= false;
+        GradientSpeed = Info.GradientSpeed or 0.35;
+        Smoothing = Info.Smoothing or 0;
+        Phase = 0;
+        CurrentPosition = MousePosition;
         Drawings = {};
+        OutlineSegments = {};
+        FillLayers = {};
     };
 
-    local FillCircle = Drawing.new('Circle');
-    local StrokeCircle = Drawing.new('Circle');
-    local FillSquare = Drawing.new('Square');
-    local StrokeSquare = Drawing.new('Square');
-
-    Fov.Drawings = { FillCircle, StrokeCircle, FillSquare, StrokeSquare };
-    for _, DrawingObject in next, Fov.Drawings do
+    local function Track(DrawingObject)
+        table.insert(Fov.Drawings, DrawingObject);
         table.insert(Library.DrawingObjects, DrawingObject);
+        return DrawingObject;
     end;
 
-    local function ApplyCircle(DrawingObject, Filled)
-        DrawingObject.Filled = Filled;
-        DrawingObject.NumSides = math.clamp(math.floor(Fov.Sides), 3, 128);
-        DrawingObject.Radius = math.max(Fov.Radius, 1);
-        DrawingObject.Thickness = math.max(Fov.Thickness, 1);
+    for Index = 1, MaxSegments do
+        Fov.OutlineSegments[Index] = Track(Drawing.new('Line'));
+        pcall(function()
+            Fov.OutlineSegments[Index].ZIndex = 2;
+        end);
     end;
 
-    local function ApplySquare(DrawingObject, Filled)
-        DrawingObject.Filled = Filled;
-        DrawingObject.Size = Vector2.new(Fov.Radius * 2, Fov.Radius * 2);
-        DrawingObject.Thickness = math.max(Fov.Thickness, 1);
+    for Index = 1, FillLayerCount do
+        Fov.FillLayers[Index] = {
+            Circle = Track(Drawing.new('Circle'));
+            Square = Track(Drawing.new('Square'));
+        };
+        pcall(function()
+            Fov.FillLayers[Index].Circle.ZIndex = 1;
+            Fov.FillLayers[Index].Square.ZIndex = 1;
+        end);
     end;
 
-    function Fov:Update()
-        local MousePosition = InputService:GetMouseLocation();
+    local function LerpColor(From, To, Alpha)
+        return Color3.new(
+            From.R + ((To.R - From.R) * Alpha),
+            From.G + ((To.G - From.G) * Alpha),
+            From.B + ((To.B - From.B) * Alpha)
+        );
+    end;
+
+    local function Wave(Value)
+        return 0.5 - (math.cos((Value % 1) * math.pi * 2) * 0.5);
+    end;
+
+    local function DirectionMultiplier(Direction)
+        Direction = tostring(Direction):lower();
+
+        if Direction == 'counterclockwise' or Direction == 'reverse' or Direction == 'left' then
+            return -1;
+        end;
+
+        return 1;
+    end;
+
+    local function ColorAt(First, Second, Position, Phase, GradientType, GradientEnabled)
+        if not GradientEnabled then
+            return First;
+        end;
+
+        GradientType = tostring(GradientType):lower();
+        Position = (Position + Phase) % 1;
+
+        if GradientType == 'rainbow' then
+            return Color3.fromHSV(Position, 0.85, 1);
+        elseif GradientType == 'pulse' then
+            return LerpColor(First, Second, Wave(Phase));
+        elseif GradientType == 'radial' then
+            return LerpColor(First, Second, math.clamp(Position, 0, 1));
+        end;
+
+        return LerpColor(First, Second, Wave(Position));
+    end;
+
+    local function SquarePoint(Center, Radius, T)
+        local Segment = (T % 1) * 4;
+        local Side = math.floor(Segment);
+        local Offset = (Segment - Side) * 2 - 1;
+
+        if Side == 0 then
+            return Center + Vector2.new(Offset * Radius, -Radius);
+        elseif Side == 1 then
+            return Center + Vector2.new(Radius, Offset * Radius);
+        elseif Side == 2 then
+            return Center + Vector2.new(-Offset * Radius, Radius);
+        end;
+
+        return Center + Vector2.new(-Radius, -Offset * Radius);
+    end;
+
+    function Fov:Update(Delta)
+        Delta = Delta or 0;
+        local TargetPosition = InputService:GetMouseLocation();
+        local Smoothing = math.clamp(self.Smoothing, 0, 0.98);
+        local FollowAlpha = Smoothing <= 0 and 1 or math.clamp(1 - math.pow(Smoothing, math.max(Delta * 60, 1)), 0.02, 1);
+
+        self.CurrentPosition = self.CurrentPosition:Lerp(TargetPosition, FollowAlpha);
+
+        if self.GradientRotation then
+            self.Phase = (self.Phase + (Delta * self.GradientSpeed * DirectionMultiplier(self.GradientDirection))) % 1;
+        end;
+
         local IsSquare = tostring(self.Shape):lower() == 'square';
         local ShouldShow = self.Enabled and self.Visible;
         local FillVisible = ShouldShow and self.Filled;
+        local Radius = math.max(self.Radius, 1);
+        local SegmentCount = IsSquare and math.clamp(math.floor(self.Sides), 4, MaxSegments) or math.clamp(math.floor(self.Sides), 3, MaxSegments);
+        local Center = self.CurrentPosition;
 
-        FillCircle.Visible = FillVisible and not IsSquare;
-        StrokeCircle.Visible = ShouldShow and not IsSquare;
-        FillSquare.Visible = FillVisible and IsSquare;
-        StrokeSquare.Visible = ShouldShow and IsSquare;
+        for Index, Line in next, self.OutlineSegments do
+            local Active = ShouldShow and Index <= SegmentCount;
+            Line.Visible = Active;
 
-        ApplyCircle(FillCircle, true);
-        ApplyCircle(StrokeCircle, false);
-        ApplySquare(FillSquare, true);
-        ApplySquare(StrokeSquare, false);
+            if Active then
+                local FromAlpha = (Index - 1) / SegmentCount;
+                local ToAlpha = Index / SegmentCount;
+                local FromPoint;
+                local ToPoint;
 
-        FillCircle.Position = MousePosition;
-        StrokeCircle.Position = MousePosition;
-        FillSquare.Position = MousePosition - Vector2.new(self.Radius, self.Radius);
-        StrokeSquare.Position = MousePosition - Vector2.new(self.Radius, self.Radius);
+                if IsSquare then
+                    FromPoint = SquarePoint(Center, Radius, FromAlpha);
+                    ToPoint = SquarePoint(Center, Radius, ToAlpha);
+                else
+                    local FromAngle = FromAlpha * math.pi * 2;
+                    local ToAngle = ToAlpha * math.pi * 2;
+                    FromPoint = Center + Vector2.new(math.cos(FromAngle) * Radius, math.sin(FromAngle) * Radius);
+                    ToPoint = Center + Vector2.new(math.cos(ToAngle) * Radius, math.sin(ToAngle) * Radius);
+                end;
 
-        FillCircle.Color = self.FillColor;
-        FillSquare.Color = self.FillColor;
-        StrokeCircle.Color = self.Color;
-        StrokeSquare.Color = self.Color;
+                Line.From = FromPoint;
+                Line.To = ToPoint;
+                Line.Thickness = math.max(self.Thickness, 1);
+                Line.Transparency = math.clamp(self.Transparency, 0, 1);
+                Line.Color = ColorAt(self.Color, self.GradientColor, FromAlpha, self.Phase, self.GradientType, self.Gradient);
+            end;
+        end;
 
-        FillCircle.Transparency = math.clamp(self.FillTransparency, 0, 1);
-        FillSquare.Transparency = math.clamp(self.FillTransparency, 0, 1);
-        StrokeCircle.Transparency = math.clamp(self.Transparency, 0, 1);
-        StrokeSquare.Transparency = math.clamp(self.Transparency, 0, 1);
+        for Index, Layer in next, self.FillLayers do
+            local Active = FillVisible and Index <= FillLayerCount;
+            local LayerAlpha = Index / FillLayerCount;
+            local LayerRadius = Radius * (1 - ((Index - 1) / FillLayerCount));
+            local Color = ColorAt(self.FillColor, self.FillGradientColor, LayerAlpha, self.Phase, self.GradientType, self.Gradient);
+
+            Layer.Circle.Visible = Active and not IsSquare;
+            Layer.Square.Visible = Active and IsSquare;
+
+            if Active then
+                Layer.Circle.Filled = true;
+                Layer.Circle.NumSides = SegmentCount;
+                Layer.Circle.Position = Center;
+                Layer.Circle.Radius = LayerRadius;
+                Layer.Circle.Color = Color;
+                Layer.Circle.Transparency = math.clamp(self.FillTransparency / FillLayerCount, 0, 1);
+
+                Layer.Square.Filled = true;
+                Layer.Square.Position = Center - Vector2.new(LayerRadius, LayerRadius);
+                Layer.Square.Size = Vector2.new(LayerRadius * 2, LayerRadius * 2);
+                Layer.Square.Color = Color;
+                Layer.Square.Transparency = math.clamp(self.FillTransparency / FillLayerCount, 0, 1);
+            end;
+        end;
     end;
 
     function Fov:SetVisible(Value)
@@ -5984,12 +6099,28 @@ function Library:CreateFovCircle(Info)
             self.Filled = Value == true;
         elseif Property == 'Color' then
             self.Color = Value;
+        elseif Property == 'GradientColor' or Property == 'SecondaryColor' then
+            self.GradientColor = Value;
         elseif Property == 'FillColor' then
             self.FillColor = Value;
+        elseif Property == 'FillGradientColor' then
+            self.FillGradientColor = Value;
         elseif Property == 'Transparency' then
             self.Transparency = math.clamp(tonumber(Value) or self.Transparency, 0, 1);
         elseif Property == 'FillTransparency' then
             self.FillTransparency = math.clamp(tonumber(Value) or self.FillTransparency, 0, 1);
+        elseif Property == 'Gradient' then
+            self.Gradient = Value == true;
+        elseif Property == 'GradientType' then
+            self.GradientType = tostring(Value or self.GradientType);
+        elseif Property == 'GradientDirection' then
+            self.GradientDirection = tostring(Value or self.GradientDirection);
+        elseif Property == 'GradientRotation' then
+            self.GradientRotation = Value == true;
+        elseif Property == 'GradientSpeed' then
+            self.GradientSpeed = tonumber(Value) or self.GradientSpeed;
+        elseif Property == 'Smoothing' then
+            self.Smoothing = math.clamp(tonumber(Value) or self.Smoothing, 0, 0.98);
         elseif Property == 'Enabled' then
             self.Enabled = Value == true;
         end;
@@ -6006,8 +6137,8 @@ function Library:CreateFovCircle(Info)
         end;
     end;
 
-    Library:GiveSignal(RenderStepped:Connect(function()
-        Fov:Update();
+    Library:GiveSignal(RenderStepped:Connect(function(Delta)
+        Fov:Update(Delta);
     end));
 
     Fov:Update();

@@ -94,17 +94,25 @@ local FovCircle = Library:CreateFovCircle({
     Radius = 120,
     Sides = 64,
     Color = Color3.new(1, 1, 1),
+    GradientColor = Color3.fromRGB(216, 114, 150),
     FillColor = Color3.new(1, 1, 1),
+    FillGradientColor = Color3.fromRGB(216, 114, 150),
     Thickness = 1,
     Filled = false,
+    Gradient = true,
+    GradientType = 'Linear', -- Linear, Radial, Pulse, Rainbow
+    GradientDirection = 'Clockwise',
+    GradientSpeed = 0.35,
+    Smoothing = 0.15,
 })
 
 FovCircle:Set('Radius', 180)
 FovCircle:Set('Filled', true)
+FovCircle:Set('GradientType', 'Rainbow')
 FovCircle:SetVisible(false)
 ```
 
-The FOV circle follows the mouse and uses the executor Drawing API. It supports circle and square shapes, polygon side count for circles, outline/fill colors, thickness, and fill opacity.
+The FOV circle follows the mouse and uses the executor Drawing API. It supports circle and square shapes, polygon side count, outline/fill colors, animated gradients, gradient direction, gradient speed, thickness, fill opacity, and smoothed mouse following.
 
 ### Body Selector
 
