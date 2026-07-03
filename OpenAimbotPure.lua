@@ -26,7 +26,6 @@ local Config = {
     Aimbot = false,
     AimMode = 'Camera',
     AimKey = 'MB2',
-    OnePressAimingMode = false,
     OffAimbotAfterKill = false,
     AimPart = 'HumanoidRootPart',
 
@@ -422,15 +421,135 @@ local Window = Library:CreateWindow({
     MenuFadeTime = 0.2,
 })
 
+local TargetInfo = Library:CreateTargetInfo({
+    Player = LocalPlayer,
+})
+
+local PlayerList = Library:CreatePlayerList({
+    Title = 'Players',
+    Size = UDim2.fromOffset(300, 432),
+})
+
+local EspPreview = Window:AddEspPreview({
+    Title = 'ESP Preview',
+    AvatarScale = 0.58,
+})
+
 local Tabs = {
     Aimbot = Window:AddTab('Aimbot'),
-    Checks = Window:AddTab('Checks'),
     Visuals = Window:AddTab('Visuals'),
-    Settings = Window:AddTab('Settings'),
+    ['UI Settings'] = Window:AddTab('UI Settings'),
 }
 
-local AimBox = Tabs.Aimbot:AddLeftGroupbox('Aimbot')
-AimBox:AddToggle('OA_Aimbot', {
+EspPreview:SetVisible(false)
+Window:OnTabChanged(function(name)
+    EspPreview:SetVisible(name == 'Visuals')
+end)
+
+local function removeValue(list, value)
+    for index = #list, 1, -1 do
+        if list[index] == value then
+            table.remove(list, index)
+        end
+    end
+end
+
+local function updateTargetFilters()
+    Config.IgnoredPlayersCheck = #Config.IgnoredPlayers > 0
+    Config.TargetPlayersCheck = #Config.TargetPlayers > 0
+end
+
+local function setPlayerDisposition(player, value)
+    if not player then
+        return
+    end
+
+    removeValue(Config.IgnoredPlayers, player.Name)
+    removeValue(Config.TargetPlayers, player.Name)
+
+    if value == 'Whitelist' then
+        table.insert(Config.IgnoredPlayers, player.Name)
+    elseif value == 'Enemy' or value == 'Sentry' or value == 'Sentry (Passive)' then
+        table.insert(Config.TargetPlayers, player.Name)
+    end
+
+    updateTargetFilters()
+end
+
+local LastTargetInfoPlayer
+local function updateTargetInfo()
+    local player = Target and Players:GetPlayerFromCharacter(Target)
+    player = player or PlayerList:GetSelectedPlayer() or LocalPlayer
+
+    if player ~= LastTargetInfoPlayer then
+        LastTargetInfoPlayer = player
+        TargetInfo:SetPlayer(player)
+    end
+end
+
+PlayerList:AddButton({
+    Text = 'Target selected',
+    Func = function(player)
+        if player and player.Character then
+            Target = player.Character
+            TargetInfo:SetPlayer(player)
+            LastTargetInfoPlayer = player
+            notify('targeting ' .. player.Name)
+        else
+            notify('no character to target')
+        end
+    end,
+})
+
+PlayerList:AddButton({
+    Text = 'Teleport',
+    Func = function(player)
+        local localRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild('HumanoidRootPart')
+        local targetRoot = player and player.Character and player.Character:FindFirstChild('HumanoidRootPart')
+
+        if localRoot and targetRoot then
+            localRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 0, -3)
+        end
+    end,
+})
+
+PlayerList:AddButton({
+    Text = 'Fling',
+    Func = function(player)
+        notify(player and ('fling selected: ' .. player.Name) or 'no player selected')
+    end,
+})
+
+PlayerList:AddToggle('OA_SpectatePlayer', {
+    Text = 'Spectate',
+    Default = false,
+    Callback = function(value, player)
+        local camera = workspace.CurrentCamera
+        local subjectCharacter = value and player and player.Character or LocalPlayer.Character
+        local humanoid = subjectCharacter and subjectCharacter:FindFirstChildOfClass('Humanoid')
+
+        if camera and humanoid then
+            camera.CameraSubject = humanoid
+        end
+    end,
+})
+
+PlayerList:AddDropdown('OA_PlayerDisposition', {
+    Values = { 'None', 'Whitelist', 'Enemy', 'Sentry', 'Sentry (Passive)' },
+    Default = 'None',
+    Callback = function(value, player)
+        setPlayerDisposition(player, value)
+    end,
+})
+
+local AimbotTabbox = Tabs.Aimbot:AddLeftTabbox('Open Aimbot')
+local AimBox = AimbotTabbox:AddTab('Aim')
+local MovementBox = AimbotTabbox:AddTab('Motion')
+local ChecksBox = AimbotTabbox:AddTab('Checks')
+local TriggerBox = AimbotTabbox:AddTab('Trigger')
+local FovBox = AimbotTabbox:AddTab('FOV')
+
+local AimbotToggle = AimBox:AddToggle('OA_Aimbot', {
     Text = 'Aimbot',
     Default = Config.Aimbot,
     Callback = function(value)
@@ -438,10 +557,11 @@ AimBox:AddToggle('OA_Aimbot', {
         if not value then resetAimbot() end
     end,
 })
-AimBox:AddToggle('OA_OnePressAim', {
-    Text = 'One-press aim',
-    Default = Config.OnePressAimingMode,
-    Callback = function(value) Config.OnePressAimingMode = value end,
+AimbotToggle:AddKeyPicker('OA_AimKey', {
+    Default = Config.AimKey,
+    Mode = 'Hold',
+    Text = 'Aimbot',
+    NoUI = false,
 })
 AimBox:AddToggle('OA_OffAfterKill', {
     Text = 'Off after kill',
@@ -460,18 +580,7 @@ AimBox:AddDropdown('OA_AimPart', {
     Default = Config.AimPart,
     Callback = function(value) Config.AimPart = value end,
 })
-AimBox:AddLabel('Aim key'):AddKeyPicker('OA_AimKey', {
-    Default = Config.AimKey,
-    Mode = 'Hold',
-    Text = 'Aim key',
-    NoUI = false,
-    Callback = function(value)
-        Aiming = Config.Aimbot and value or false
-        if not Aiming then resetAimbot() end
-    end,
-})
 
-local MovementBox = Tabs.Aimbot:AddRightGroupbox('Motion')
 MovementBox:AddToggle('OA_UseSensitivity', {
     Text = 'Smooth camera',
     Default = Config.UseSensitivity,
@@ -526,14 +635,19 @@ MovementBox:AddSlider('OA_NoiseFrequency', {
     Callback = function(value) Config.NoiseFrequency = value end,
 })
 
-local TriggerBox = Tabs.Aimbot:AddRightGroupbox('Triggerbot')
-TriggerBox:AddToggle('OA_TriggerBot', {
+local TriggerToggle = TriggerBox:AddToggle('OA_TriggerBot', {
     Text = 'Triggerbot',
     Default = Config.TriggerBot,
     Callback = function(value)
         Config.TriggerBot = value
         if not value then Triggering = false end
     end,
+})
+TriggerToggle:AddKeyPicker('OA_TriggerKey', {
+    Default = Config.TriggerKey,
+    Mode = 'Toggle',
+    Text = 'Triggerbot',
+    NoUI = false,
 })
 TriggerBox:AddToggle('OA_SmartTrigger', {
     Text = 'Only while aiming',
@@ -548,25 +662,15 @@ TriggerBox:AddSlider('OA_TriggerChance', {
     Rounding = 0,
     Callback = function(value) Config.TriggerBotChance = value end,
 })
-TriggerBox:AddLabel('Trigger key'):AddKeyPicker('OA_TriggerKey', {
-    Default = Config.TriggerKey,
-    Mode = 'Toggle',
-    Text = 'Triggerbot',
-    NoUI = false,
-    Callback = function(value) Triggering = Config.TriggerBot and value or false end,
-})
 
-local SimpleChecks = Tabs.Checks:AddLeftGroupbox('Simple checks')
-SimpleChecks:AddToggle('OA_AliveCheck', { Text = 'Alive check', Default = Config.AliveCheck, Callback = function(value) Config.AliveCheck = value end })
-SimpleChecks:AddToggle('OA_GodCheck', { Text = 'God check', Default = Config.GodCheck, Callback = function(value) Config.GodCheck = value end })
-SimpleChecks:AddToggle('OA_TeamCheck', { Text = 'Team check', Default = Config.TeamCheck, Callback = function(value) Config.TeamCheck = value end })
-SimpleChecks:AddToggle('OA_FriendCheck', { Text = 'Friend check', Default = Config.FriendCheck, Callback = function(value) Config.FriendCheck = value end })
-SimpleChecks:AddToggle('OA_WallCheck', { Text = 'Wall check', Default = Config.WallCheck, Callback = function(value) Config.WallCheck = value end })
-SimpleChecks:AddToggle('OA_WaterCheck', { Text = 'Ignore water', Default = Config.WaterCheck, Callback = function(value) Config.WaterCheck = value end })
-
-local AdvancedChecks = Tabs.Checks:AddRightGroupbox('Advanced checks')
-AdvancedChecks:AddToggle('OA_FovCheck', { Text = 'FOV check', Default = Config.FoVCheck, Callback = function(value) Config.FoVCheck = value end })
-AdvancedChecks:AddSlider('OA_FovRadiusCheck', {
+ChecksBox:AddToggle('OA_AliveCheck', { Text = 'Alive check', Default = Config.AliveCheck, Callback = function(value) Config.AliveCheck = value end })
+ChecksBox:AddToggle('OA_GodCheck', { Text = 'God check', Default = Config.GodCheck, Callback = function(value) Config.GodCheck = value end })
+ChecksBox:AddToggle('OA_TeamCheck', { Text = 'Team check', Default = Config.TeamCheck, Callback = function(value) Config.TeamCheck = value end })
+ChecksBox:AddToggle('OA_FriendCheck', { Text = 'Friend check', Default = Config.FriendCheck, Callback = function(value) Config.FriendCheck = value end })
+ChecksBox:AddToggle('OA_WallCheck', { Text = 'Wall check', Default = Config.WallCheck, Callback = function(value) Config.WallCheck = value end })
+ChecksBox:AddToggle('OA_WaterCheck', { Text = 'Ignore water', Default = Config.WaterCheck, Callback = function(value) Config.WaterCheck = value end })
+ChecksBox:AddToggle('OA_FovCheck', { Text = 'FOV check', Default = Config.FoVCheck, Callback = function(value) Config.FoVCheck = value end })
+ChecksBox:AddSlider('OA_FovRadiusCheck', {
     Text = 'FOV radius',
     Default = Config.FoVRadius,
     Min = 20,
@@ -577,8 +681,8 @@ AdvancedChecks:AddSlider('OA_FovRadiusCheck', {
         FovCircle:Set('Radius', value)
     end,
 })
-AdvancedChecks:AddToggle('OA_MagnitudeCheck', { Text = 'Magnitude check', Default = Config.MagnitudeCheck, Callback = function(value) Config.MagnitudeCheck = value end })
-AdvancedChecks:AddSlider('OA_MaxMagnitude', {
+ChecksBox:AddToggle('OA_MagnitudeCheck', { Text = 'Magnitude check', Default = Config.MagnitudeCheck, Callback = function(value) Config.MagnitudeCheck = value end })
+ChecksBox:AddSlider('OA_MaxMagnitude', {
     Text = 'Max distance',
     Default = Config.TriggerMagnitude,
     Min = 25,
@@ -586,8 +690,8 @@ AdvancedChecks:AddSlider('OA_MaxMagnitude', {
     Rounding = 0,
     Callback = function(value) Config.TriggerMagnitude = value end,
 })
-AdvancedChecks:AddToggle('OA_TransparencyCheck', { Text = 'Transparency check', Default = Config.TransparencyCheck, Callback = function(value) Config.TransparencyCheck = value end })
-AdvancedChecks:AddSlider('OA_TransparencyLimit', {
+ChecksBox:AddToggle('OA_TransparencyCheck', { Text = 'Transparency check', Default = Config.TransparencyCheck, Callback = function(value) Config.TransparencyCheck = value end })
+ChecksBox:AddSlider('OA_TransparencyLimit', {
     Text = 'Transparency limit',
     Default = Config.IgnoredTransparency,
     Min = 0,
@@ -596,7 +700,6 @@ AdvancedChecks:AddSlider('OA_TransparencyLimit', {
     Callback = function(value) Config.IgnoredTransparency = value end,
 })
 
-local FovBox = Tabs.Visuals:AddLeftGroupbox('FOV')
 FovBox:AddToggle('OA_FovVisible', {
     Text = 'Show FOV',
     Default = Config.FoV,
@@ -660,7 +763,7 @@ FovBox:AddLabel('Accent color'):AddColorPicker('OA_FovAccent', {
     end,
 })
 
-local EspBox = Tabs.Visuals:AddRightGroupbox('ESP')
+local EspBox = Tabs.Visuals:AddLeftGroupbox('ESP')
 EspBox:AddToggle('OA_ESP', { Text = 'Enable ESP', Default = Config.ESP, Callback = function(value) Config.ESP = value end })
 EspBox:AddToggle('OA_ESPBox', { Text = 'Boxes', Default = Config.ESPBox, Callback = function(value) Config.ESPBox = value end })
 EspBox:AddToggle('OA_ESPBoxFilled', { Text = 'Filled boxes', Default = Config.ESPBoxFilled, Callback = function(value) Config.ESPBoxFilled = value end })
@@ -676,7 +779,7 @@ EspBox:AddLabel('ESP color'):AddColorPicker('OA_ESPColor', {
     Callback = function(value) Config.ESPColour = value end,
 })
 
-local SettingsBox = Tabs.Settings:AddLeftGroupbox('Menu')
+local SettingsBox = Tabs['UI Settings']:AddLeftGroupbox('Menu')
 SettingsBox:AddButton('Unload', function()
     Library:Unload()
 end)
@@ -693,8 +796,17 @@ SaveManager:IgnoreThemeSettings()
 SaveManager:SetIgnoreIndexes({ 'MenuKeybind' })
 ThemeManager:SetFolder('PureOpenAimbot')
 SaveManager:SetFolder('PureOpenAimbot/' .. tostring(game.GameId))
-SaveManager:BuildConfigSection(Tabs.Settings)
-ThemeManager:ApplyToTab(Tabs.Settings)
+SaveManager:BuildConfigSection(Tabs['UI Settings'])
+ThemeManager:ApplyToTab(Tabs['UI Settings'])
+
+local function showManagedWindows()
+    Library:SetManagedWindowVisible('Keybinds', true)
+    Library:SetManagedWindowVisible('PlayerList', true)
+    Library:SetManagedWindowVisible('TargetInfo', true)
+end
+
+showManagedWindows()
+task.delay(0.35, showManagedWindows)
 
 table.insert(Connections, Players.PlayerRemoving:Connect(function(player)
     local set = EspObjects[player]
@@ -718,6 +830,14 @@ table.insert(Connections, RunService.RenderStepped:Connect(function()
     setDrawingFovVisible(Config.FoV)
     updateEsp()
 
+    local nextAiming = Config.Aimbot and Options.OA_AimKey and Options.OA_AimKey:GetState() or false
+    if Aiming and not nextAiming then
+        resetAimbot()
+    end
+
+    Aiming = nextAiming
+    Triggering = Config.TriggerBot and Options.OA_TriggerKey and Options.OA_TriggerKey:GetState() or false
+
     if Config.TriggerBot and Triggering and (not Config.SmartTriggerBot or Aiming) and getfenv().mouse1click and Mouse.Target then
         local model = Mouse.Target:FindFirstAncestorOfClass('Model')
         if model and select(1, resolveTarget(model)) and chance(Config.TriggerBotChance) then
@@ -727,15 +847,13 @@ table.insert(Connections, RunService.RenderStepped:Connect(function()
 
     if not Config.Aimbot then
         if Aiming then resetAimbot() end
+        updateTargetInfo()
         return
-    end
-
-    if not Aiming and Options.OA_AimKey then
-        Aiming = Options.OA_AimKey:GetState()
     end
 
     if not Aiming then
         resetAimbot()
+        updateTargetInfo()
         return
     end
 
@@ -753,12 +871,23 @@ table.insert(Connections, RunService.RenderStepped:Connect(function()
     else
         resetAimbot(true)
     end
+
+    updateTargetInfo()
 end))
 
 Library:OnUnload(function()
     resetAimbot()
     FovCircle:Destroy()
     clearEsp()
+    pcall(function()
+        TargetInfo:Destroy()
+    end)
+    pcall(function()
+        PlayerList:Destroy()
+    end)
+    pcall(function()
+        EspPreview:Destroy()
+    end)
     for _, connection in ipairs(Connections) do
         pcall(function()
             connection:Disconnect()
