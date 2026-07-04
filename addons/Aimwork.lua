@@ -81,6 +81,7 @@ Aimwork.DefaultConfiguration = {
     TargetLock = {
         Enabled = false,
         LockOnly = false,
+        IgnoreFov = false,
         Mode = 'Lock',
         Bind = Enum.KeyCode.F1,
     },
@@ -430,7 +431,7 @@ function Aimwork:WallHit(playerObject, part, camera)
     return result.Instance ~= part and not playerObject.character:IsAncestorOf(result.Instance)
 end
 
-function Aimwork:PartCheck(playerObject, part)
+function Aimwork:PartCheck(playerObject, part, ignoreFov)
     local checks = self.settings.Checks
     local camera = Workspace.CurrentCamera
 
@@ -463,7 +464,7 @@ function Aimwork:PartCheck(playerObject, part)
     local screen2D = Vector2.new(screenPosition.X, screenPosition.Y)
     local bestDistance = math.huge
 
-    if not next(self.fovs) then
+    if ignoreFov or not next(self.fovs) then
         bestDistance = (UserInputService:GetMouseLocation() - screen2D).Magnitude
     else
         for fovObject, data in pairs(self.fovs) do
@@ -485,14 +486,14 @@ function Aimwork:PartCheck(playerObject, part)
     end
 end
 
-function Aimwork:IteratePlayer(playerObject)
+function Aimwork:IteratePlayer(playerObject, ignoreFov)
     if not playerObject.character or not self:PlayerCheck(playerObject) then
         return
     end
 
     for _, part in ipairs(playerObject.bodyParts) do
         if self:PartAllowed(part) then
-            self:PartCheck(playerObject, part)
+            self:PartCheck(playerObject, part, ignoreFov)
         end
     end
 end
@@ -507,7 +508,7 @@ function Aimwork:Iterate()
     end
 
     if self.settings.TargetLock.Enabled and self._lockTarget then
-        self:IteratePlayer(self._lockTarget)
+        self:IteratePlayer(self._lockTarget, self.settings.TargetLock.IgnoreFov == true)
         return self.selected
     elseif self.settings.TargetLock.LockOnly then
         return self.selected

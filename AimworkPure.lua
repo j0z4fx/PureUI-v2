@@ -43,6 +43,8 @@ local Config = {
     UseSensitivity = true,
     Sensitivity = 50,
     SmoothingType = 'Linear',
+    Prediction = false,
+    PredictionAmount = 0.12,
     UseNoise = false,
     NoiseFrequency = 10,
 
@@ -203,6 +205,10 @@ local function getAimWorldPosition(selected)
     local humanoid = character and character:FindFirstChildOfClass('Humanoid')
     local worldPosition = targetPart and targetPart.Position or Vector3.zero
     local offset = Vector3.zero
+
+    if Config.Prediction and targetPart then
+        worldPosition = worldPosition + (targetPart.AssemblyLinearVelocity * Config.PredictionAmount)
+    end
 
     if Config.UseOffset then
         local static = Vector3.new(0, targetPart.Position.Y * Config.StaticOffsetIncrement / 10, 0)
@@ -491,6 +497,7 @@ local function buildAimworkSettings()
         TargetLock = {
             Enabled = Config.StickyAim,
             LockOnly = false,
+            IgnoreFov = Config.StickyAim,
             Mode = 'Lock',
             Bind = keyNameToInput(Config.AimKey),
         },
@@ -538,6 +545,7 @@ local function syncAimworkSettings()
     local settings = instance.settings
     settings.TargetLock.Enabled = Config.StickyAim
     settings.TargetLock.LockOnly = Config.StickyAim
+    settings.TargetLock.IgnoreFov = Config.StickyAim
     settings.TargetLock.Mode = 'Lock'
     settings.TargetLock.Bind = keyNameToInput(Config.AimKey)
     settings.Checks.ForceField = Config.ForceFieldCheck
@@ -712,11 +720,17 @@ local AimbotToggle = AimBox:AddToggle('AW_Aimbot', {
 AimbotToggle:AddKeyPicker('AW_AimKey', {
     Default = Config.AimKey,
     Mode = 'Hold',
-    Modes = { 'Hold' },
+    Modes = { 'Always', 'Toggle', 'Hold' },
     Text = 'Target select',
     NoUI = false,
-    Callback = function(value)
-        Config.AimKey = value
+    ChangedCallback = function(value)
+        if value == Enum.UserInputType.MouseButton1 then
+            Config.AimKey = 'MB1'
+        elseif value == Enum.UserInputType.MouseButton2 then
+            Config.AimKey = 'MB2'
+        elseif typeof(value) == 'EnumItem' then
+            Config.AimKey = value.Name
+        end
     end,
 })
 
@@ -757,6 +771,22 @@ AimBox:AddDropdown('AW_SmoothingType', {
     Default = Config.SmoothingType,
     Callback = function(value) Config.SmoothingType = value end,
 })
+
+local PredictionToggle = AimBox:AddToggle('AW_Prediction', {
+    Text = 'Prediction',
+    Default = Config.Prediction,
+    Callback = function(value) Config.Prediction = value end,
+})
+local PredictionDependency = AimBox:AddDependencyBox()
+PredictionDependency:AddSlider('AW_PredictionAmount', {
+    Text = 'Prediction amount',
+    Default = Config.PredictionAmount,
+    Min = 0,
+    Max = 0.5,
+    Rounding = 2,
+    Callback = function(value) Config.PredictionAmount = value end,
+})
+PredictionDependency:SetupDependencies({ { PredictionToggle, true } })
 
 PartFilterBox:AddBodySelector('AW_AimParts', {
     Default = Config.AimParts,
@@ -940,13 +970,15 @@ table.insert(Connections, RunService.RenderStepped:Connect(function(Delta)
         updateEsp()
     end
 
-    local lockKeyDown = Config.Aimbot and Config.StickyAim and Options.AW_AimKey and Options.AW_AimKey:GetState() or false
-    if lockKeyDown and not LastTargetLockKey then
+    local keyActive = Config.Aimbot and Options.AW_AimKey and Options.AW_AimKey:GetState() or false
+    if Config.StickyAim and keyActive and not LastTargetLockKey then
         AimworkTarget:LockTarget()
+    elseif Config.StickyAim and not keyActive and LastTargetLockKey then
+        AimworkTarget._lockTarget = nil
     end
-    LastTargetLockKey = lockKeyDown
+    LastTargetLockKey = keyActive
 
-    local nextAiming = Config.Aimbot
+    local nextAiming = Config.Aimbot and keyActive
     if Aiming and not nextAiming then
         resetAimbot()
     end

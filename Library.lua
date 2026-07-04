@@ -2634,8 +2634,10 @@ do
         end
 
         local PickOuter = Library:Create('Frame', {
+            AnchorPoint = Vector2.new(1, 0);
             BackgroundColor3 = Color3.new(0, 0, 0);
             BorderColor3 = Color3.new(0, 0, 0);
+            Position = UDim2.new(1, -2, 0, 1);
             Size = UDim2.new(0, 34, 0, 15);
             ZIndex = 6;
             Parent = ToggleLabel;
@@ -2667,16 +2669,21 @@ do
 
         local ModeSelectOuter = Library:Create('Frame', {
             BorderColor3 = Color3.new(0, 0, 0);
-            Position = UDim2.fromOffset(ToggleLabel.AbsolutePosition.X + ToggleLabel.AbsoluteSize.X + 4, ToggleLabel.AbsolutePosition.Y + 1);
+            Position = UDim2.fromOffset(PickOuter.AbsolutePosition.X + PickOuter.AbsoluteSize.X + 4, PickOuter.AbsolutePosition.Y);
             Size = UDim2.new(0, 60, 0, 45 + 2);
             Visible = false;
             ZIndex = 14;
             Parent = ScreenGui;
         });
 
-        ToggleLabel:GetPropertyChangedSignal('AbsolutePosition'):Connect(function()
-            ModeSelectOuter.Position = UDim2.fromOffset(ToggleLabel.AbsolutePosition.X + ToggleLabel.AbsoluteSize.X + 4, ToggleLabel.AbsolutePosition.Y + 1);
-        end);
+        local function UpdateModeSelectPosition()
+            ModeSelectOuter.Position = UDim2.fromOffset(PickOuter.AbsolutePosition.X + PickOuter.AbsoluteSize.X + 4, PickOuter.AbsolutePosition.Y);
+        end
+
+        ToggleLabel:GetPropertyChangedSignal('AbsolutePosition'):Connect(UpdateModeSelectPosition);
+        ToggleLabel:GetPropertyChangedSignal('AbsoluteSize'):Connect(UpdateModeSelectPosition);
+        PickOuter:GetPropertyChangedSignal('AbsolutePosition'):Connect(UpdateModeSelectPosition);
+        PickOuter:GetPropertyChangedSignal('AbsoluteSize'):Connect(UpdateModeSelectPosition);
 
         local ModeSelectInner = Library:Create('Frame', {
             BackgroundColor3 = Library.ControlColor;
@@ -2710,6 +2717,7 @@ do
 
         local Modes = Info.Modes or { 'Always', 'Toggle', 'Hold' };
         local ModeButtons = {};
+        ModeSelectOuter.Size = UDim2.new(0, 60, 0, (#Modes * 15) + 2);
 
         for Idx, Mode in next, Modes do
             local ModeButton = {};
@@ -2800,7 +2808,8 @@ do
                     return Key == 'MB1' and InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
                         or Key == 'MB2' and InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2);
                 else
-                    return InputService:IsKeyDown(Enum.KeyCode[KeyPicker.Value]);
+                    local KeyCode = Enum.KeyCode[KeyPicker.Value];
+                    return KeyCode and InputService:IsKeyDown(KeyCode) or false;
                 end;
             else
                 return KeyPicker.Toggled;
@@ -2811,7 +2820,10 @@ do
             local Key, Mode = Data[1], Data[2];
             DisplayLabel.Text = Key;
             KeyPicker.Value = Key;
-            ModeButtons[Mode]:Select();
+            local Button = ModeButtons[Mode] or ModeButtons[KeyPicker.Mode] or ModeButtons[Modes[1]];
+            if Button then
+                Button:Select();
+            end
             KeyPicker:Update();
         end;
 
@@ -2889,6 +2901,7 @@ do
                     Event:Disconnect();
                 end);
             elseif Input.UserInputType == Enum.UserInputType.MouseButton2 and not Library:MouseIsOverOpenedFrame() then
+                UpdateModeSelectPosition();
                 ModeSelectOuter.Visible = true;
             end;
         end);
