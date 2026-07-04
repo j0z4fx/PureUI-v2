@@ -384,18 +384,23 @@ function Library:SetManagedWindowsOpen(MenuOpen)
     end;
 end;
 
-function Library:GetLucideIcon(Name)
-    if not Library.Lucide then
+function Library:GetIconAsset(Name)
+    if not Library.Icons then
         local Ok, Module = pcall(function()
-            return loadstring(game:HttpGet('https://raw.githubusercontent.com/j0z4fx/PureUI-v2/main/addons/Lucide.lua'))();
+            local Repo = getgenv().PureUIRepo or 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/main/';
+            if Repo:sub(-1) ~= '/' then
+                Repo = Repo .. '/';
+            end;
+
+            return loadstring(game:HttpGet(Repo .. 'addons/Icons.lua'))();
         end);
 
-        Library.Lucide = Ok and Module or false;
+        Library.Icons = Ok and Module or false;
     end;
 
-    if Library.Lucide and type(Library.Lucide.GetAsset) == 'function' then
+    if Library.Icons and type(Library.Icons.GetIcon) == 'function' then
         local Ok, Asset = pcall(function()
-            return Library.Lucide.GetAsset(Name);
+            return Library.Icons.GetIcon(Name);
         end);
 
         if Ok then
@@ -482,16 +487,14 @@ function Library:CreateBottomBar()
         }, true);
         Library:AddGradient(ButtonInner, 'ControlColor');
 
-        local IconAsset = Library:GetLucideIcon(IconName);
+        local IconAsset = Library:GetIconAsset(IconName);
 
         if IconAsset then
             local Icon = Library:Create('ImageLabel', {
                 AnchorPoint = Vector2.new(0.5, 0.5);
                 BackgroundTransparency = 1;
-                Image = IconAsset.Url;
+                Image = IconAsset;
                 ImageColor3 = Library.FontColor;
-                ImageRectOffset = IconAsset.ImageRectOffset;
-                ImageRectSize = IconAsset.ImageRectSize;
                 Position = UDim2.fromScale(0.5, 0.5);
                 Size = UDim2.fromOffset(16, 16);
                 ZIndex = 225;

@@ -147,7 +147,15 @@ The curve editor is a compact draggable point editor for normalized `X/Y` contro
 
 ### Icons
 
-Lucide icons are vendored in `addons/Lucide.lua` from `notpoiu/lucide-roblox-direct`. The bottom bar uses those icons directly and falls back to short text if the icon payload cannot load.
+Icons are provided through `addons/Icons.lua` and `addons/IconsData.lua` from `Footagesus/Icons`. The bottom bar uses direct `rbxassetid://` icon assets and falls back to short text if the icon payload cannot load.
+
+### Aimwork Adapter
+
+```lua
+loadstring(game:HttpGet('https://raw.githubusercontent.com/j0z4fx/PureUI-v2/main/AimworkPure.lua'))()
+```
+
+`AimworkPure.lua` is a PureUI adapter around the bundled `addons/Aimwork.lua` runtime. The adapter keeps PureUI's custom game checks, target info, player list, ESP preview, triggerbot FOV, and R6 aim-part picker while using Aimwork-style player and part selection internally.
 
 ### Command Modal
 

@@ -1,8 +1,11 @@
--- PureUI Open Aimbot adapter
--- Based on ttwizz/Open-Aimbot (MIT): https://github.com/ttwizz/Open-Aimbot
--- This keeps the core target/check/visual behavior and replaces the original Fluent UI with PureUI.
+-- PureUI Aimwork adapter
+-- Based on Stefanuk12/aimwork: https://github.com/Stefanuk12/aimwork
+-- PureUI supplies the controls, target info, player list, custom game checks, and visuals.
 
-local repo = 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/0561766618d8aa4842f824200df59f64b1c601fb/'
+local repo = getgenv().PureUIRepo or 'https://raw.githubusercontent.com/j0z4fx/PureUI-v2/main/'
+if repo:sub(-1) ~= '/' then
+    repo = repo .. '/'
+end
 local cacheBust = '?v=' .. tostring(os.time())
 
 local Library = loadstring(game:HttpGet(repo .. 'Library.lua' .. cacheBust))()
@@ -10,6 +13,7 @@ local Toggles = getgenv().Toggles
 local Options = getgenv().Options
 local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua' .. cacheBust))()
 local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua' .. cacheBust))()
+local Aimwork = loadstring(game:HttpGet(repo .. 'addons/Aimwork.lua' .. cacheBust))()
 
 local Players = game:GetService('Players')
 local UserInputService = game:GetService('UserInputService')
@@ -100,7 +104,7 @@ local Connections = {}
 local EspObjects = {}
 
 local function notify(message)
-    Library:Notify('[Open Aimbot] ' .. message, 2)
+    Library:Notify('[Aimwork] ' .. message, 2)
 end
 
 local function chance(percent)
@@ -162,70 +166,6 @@ local function normalizeAimParts(value)
     return normalized
 end
 
-local function getAimCandidates(character)
-    local candidates = {}
-    normalizeAimParts(Config.AimParts)
-
-    for _, key in ipairs(AimPartOrder) do
-        if Config.AimParts[key] then
-            for _, partName in ipairs(AimPartMap[key] or { key }) do
-                local part = getPart(character, partName)
-                if part and part:IsA('BasePart') then
-                    table.insert(candidates, part)
-                    break
-                end
-            end
-        end
-    end
-
-    if #candidates == 0 then
-        local fallback = getOriginPart(character)
-        if fallback then
-            table.insert(candidates, fallback)
-        end
-    end
-
-    return candidates
-end
-
-local function chooseAimPart(character)
-    local candidates = getAimCandidates(character)
-    local mousePosition = UserInputService:GetMouseLocation()
-    local bestPart
-    local bestDistance = math.huge
-
-    for _, part in ipairs(candidates) do
-        local viewportPosition, inViewport = Camera:WorldToViewportPoint(part.Position)
-        local screenDistance = inViewport and (Vector2.new(viewportPosition.X, viewportPosition.Y) - mousePosition).Magnitude or math.huge
-
-        if screenDistance < bestDistance then
-            bestDistance = screenDistance
-            bestPart = part
-        end
-    end
-
-    return bestPart or candidates[1]
-end
-
-local function getBodyEffectActive(character, name)
-    local effects = character and character:FindFirstChild('BodyEffects')
-    local value = effects and effects:FindFirstChild(name)
-
-    if not value then
-        return false
-    elseif value:IsA('BoolValue') then
-        return value.Value == true
-    elseif value:IsA('ObjectValue') then
-        return value.Value ~= nil
-    elseif value:IsA('StringValue') then
-        return value.Value ~= ''
-    elseif value:IsA('NumberValue') or value:IsA('IntValue') then
-        return value.Value ~= 0
-    end
-
-    return false
-end
-
 local function getArmorValue(character)
     local effects = character and character:FindFirstChild('BodyEffects')
     local armor = effects and effects:FindFirstChild('Armor')
@@ -249,102 +189,19 @@ local function resetAimbot(saveAiming, saveTarget)
     UserInputService.MouseDeltaSensitivity = MouseSensitivity
 end
 
-local function targetAllowed(player, character, targetPart)
-    if not player or player == LocalPlayer then
-        return false
-    end
-
+local function getAimWorldPosition(selected)
+    local targetPart = selected and selected.part
+    local character = selected and selected.character
     local humanoid = character and character:FindFirstChildOfClass('Humanoid')
-    if not humanoid then
-        return false
-    end
-
-    if Config.AliveCheck and humanoid.Health <= 0 then
-        return false
-    end
-
-    if Config.ForceFieldCheck and character:FindFirstChildOfClass('ForceField') then
-        return false
-    end
-
-    if Config.KOCheck and getBodyEffectActive(character, 'K.O') then
-        return false
-    end
-
-    if Config.HeldCheck and getBodyEffectActive(character, 'Grabbed') then
-        return false
-    end
-
-    if Config.TeamCheck and player.TeamColor == LocalPlayer.TeamColor then
-        return false
-    end
-
-    if Config.FriendCheck and player:IsFriendsWith(LocalPlayer.UserId) then
-        return false
-    end
-
-    if Config.TransparencyCheck then
-        local head = character:FindFirstChild('Head')
-        if head and head:IsA('BasePart') and head.Transparency >= Config.IgnoredTransparency then
-            return false
-        end
-    end
-
-    if Config.IgnoredPlayersCheck and table.find(Config.IgnoredPlayers, player.Name) then
-        return false
-    end
-
-    if Config.TargetPlayersCheck and not table.find(Config.TargetPlayers, player.Name) then
-        return false
-    end
-
-    if Config.MagnitudeCheck then
-        local nativePart = getOriginPart(localCharacter())
-        if nativePart and (targetPart.Position - nativePart.Position).Magnitude > Config.TriggerMagnitude then
-            return false
-        end
-    end
-
-    if Config.WallCheck then
-        local nativePart = getOriginPart(localCharacter())
-        if nativePart then
-            local params = RaycastParams.new()
-            params.FilterType = Enum.RaycastFilterType.Exclude
-            params.FilterDescendantsInstances = { localCharacter() }
-            params.IgnoreWater = true
-
-            local direction = targetPart.Position - nativePart.Position
-            local result = workspace:Raycast(nativePart.Position, direction, params)
-            if not result or not result.Instance or not result.Instance:IsDescendantOf(character) then
-                return false
-            end
-        end
-    end
-
-    return true
-end
-
-local function resolveTarget(character)
-    local localChar = localCharacter()
-    local nativePart = getOriginPart(localChar)
-    local targetPart = chooseAimPart(character)
-    local humanoid = character and character:FindFirstChildOfClass('Humanoid')
-    local player = Players:GetPlayerFromCharacter(character)
-
-    if not (localChar and nativePart and targetPart and targetPart:IsA('BasePart') and humanoid and player) then
-        return false
-    end
-
-    if not targetAllowed(player, character, targetPart) then
-        return false
-    end
-
+    local worldPosition = targetPart and targetPart.Position or Vector3.zero
     local offset = Vector3.zero
+
     if Config.UseOffset then
         local static = Vector3.new(0, targetPart.Position.Y * Config.StaticOffsetIncrement / 10, 0)
-        local dynamic = humanoid.MoveDirection * Config.DynamicOffsetIncrement / 10
+        local dynamic = humanoid and humanoid.MoveDirection * Config.DynamicOffsetIncrement / 10 or Vector3.zero
+        local nativePart = getOriginPart(localCharacter())
 
-        if Config.AutoOffset then
+        if Config.AutoOffset and nativePart then
             local autoY = math.min(targetPart.Position.Y * Config.StaticOffsetIncrement * (targetPart.Position - nativePart.Position).Magnitude / 1000, Config.MaxAutoOffset)
             offset = Vector3.new(0, autoY, 0) + dynamic
         elseif Config.OffsetType == 'Dynamic' then
@@ -362,30 +219,7 @@ local function resolveTarget(character)
         noise = Vector3.new(math.random() * n * 2 - n, math.random() * n * 2 - n, math.random() * n * 2 - n)
     end
 
-    local worldPosition = targetPart.Position + offset + noise
-    local viewportPosition, inViewport = Camera:WorldToViewportPoint(worldPosition)
-    local distance = (worldPosition - nativePart.Position).Magnitude
-
-    return true, character, viewportPosition, inViewport, worldPosition, distance, targetPart
-end
-
-local function acquireTarget()
-    local closest = math.huge
-    local best = nil
-    local mousePosition = UserInputService:GetMouseLocation()
-
-    for _, player in ipairs(Players:GetPlayers()) do
-        local ok, character, viewportPosition, inViewport = resolveTarget(player.Character)
-        if ok and inViewport then
-            local screenDistance = (Vector2.new(viewportPosition.X, viewportPosition.Y) - mousePosition).Magnitude
-            if screenDistance <= closest and (not Config.FoVCheck or screenDistance <= Config.FoVRadius) then
-                closest = screenDistance
-                best = character
-            end
-        end
-    end
-
-    return best
+    return worldPosition + offset + noise
 end
 
 local function aimAt(worldPosition, viewportPosition, inViewport)
@@ -543,7 +377,7 @@ local function updateEsp()
             local show = false
 
             if Config.ESP and character and head and root and humanoid then
-                local ready = not Config.SmartESP or select(1, resolveTarget(character))
+                local ready = true
                 local rootPos, inViewport = Camera:WorldToViewportPoint(root.Position)
                 local headPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
                 local bottomPos = Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
@@ -624,8 +458,118 @@ local function targetInsideTriggerFov(viewportPosition)
     return (Vector2.new(viewportPosition.X, viewportPosition.Y) - mousePosition).Magnitude <= Config.TriggerFoVRadius
 end
 
+local function makeMouseFov(id, radiusGetter, enabledGetter)
+    return {
+        id = id,
+        Update = function() end,
+        Destroy = function() end,
+        InsideFOV = function(_, position)
+            local distance = (UserInputService:GetMouseLocation() - position).Magnitude
+            if not enabledGetter() then
+                return true, distance
+            end
+
+            local radius = radiusGetter()
+            return distance <= radius, distance
+        end,
+    }
+end
+
+local function selectedIsValid(selected)
+    return selected
+        and selected.player
+        and selected.player ~= LocalPlayer
+        and selected.character
+        and selected.part
+end
+
+local function getAimPartNameMap()
+    local names = {}
+    normalizeAimParts(Config.AimParts)
+
+    for key, enabled in pairs(Config.AimParts) do
+        if enabled then
+            for _, partName in ipairs(AimPartMap[key] or { key }) do
+                names[partName] = true
+            end
+        end
+    end
+
+    return names
+end
+
+local function buildAimworkSettings()
+    return {
+        Checks = {
+            ForceField = Config.ForceFieldCheck,
+            Friend = Config.FriendCheck,
+            Dead = Config.AliveCheck,
+            Invisible = Config.TransparencyCheck,
+            TransparencyLimit = Config.IgnoredTransparency,
+            Magnitude = Config.MagnitudeCheck,
+            MaxMagnitude = Config.TriggerMagnitude,
+            Ignored = Config.TeamCheck or Config.TargetPlayersCheck or Config.IgnoredPlayersCheck,
+            WallCheck = Config.WallCheck and 'Full' or false,
+            KO = Config.KOCheck,
+            Held = Config.HeldCheck,
+        },
+        PartFilter = {
+            Type = 'Allowlist',
+            Name = getAimPartNameMap(),
+        },
+        Ignored = {
+            IgnoreLocalTeam = Config.TeamCheck,
+            AllowlistEnabledFor = {
+                Teams = false,
+                Players = Config.TargetPlayersCheck,
+            },
+            Teams = {},
+            Players = Config.TargetPlayersCheck and Config.TargetPlayers or (Config.IgnoredPlayersCheck and Config.IgnoredPlayers or {}),
+        },
+    }
+end
+
+local AimworkTarget = Aimwork.new(buildAimworkSettings())
+local AimworkTrigger = Aimwork.new(buildAimworkSettings())
+
+local AimFovObject = makeMouseFov('AimFOV', function()
+    return Config.FoVRadius
+end, function()
+    return Config.FoVCheck
+end)
+
+local TriggerFovObject = makeMouseFov('TriggerFOV', function()
+    return Config.TriggerFoVRadius
+end, function()
+    return Config.TriggerFoVCheck
+end)
+
+AimworkTarget:RegisterCustomFov(AimFovObject)
+AimworkTrigger:RegisterCustomFov(TriggerFovObject)
+
+local function syncAimworkSettings()
+    for _, instance in ipairs({ AimworkTarget, AimworkTrigger }) do
+        local settings = instance.settings
+        settings.Checks.ForceField = Config.ForceFieldCheck
+        settings.Checks.Friend = Config.FriendCheck
+        settings.Checks.Dead = Config.AliveCheck
+        settings.Checks.Invisible = Config.TransparencyCheck
+        settings.Checks.TransparencyLimit = Config.IgnoredTransparency
+        settings.Checks.Magnitude = Config.MagnitudeCheck
+        settings.Checks.MaxMagnitude = Config.TriggerMagnitude
+        settings.Checks.Ignored = Config.TeamCheck or Config.TargetPlayersCheck or Config.IgnoredPlayersCheck
+        settings.Checks.WallCheck = Config.WallCheck and 'Full' or false
+        settings.Checks.KO = Config.KOCheck
+        settings.Checks.Held = Config.HeldCheck
+        settings.Ignored.IgnoreLocalTeam = Config.TeamCheck
+        settings.Ignored.AllowlistEnabledFor.Players = Config.TargetPlayersCheck
+        settings.Ignored.Players = Config.TargetPlayersCheck and Config.TargetPlayers or (Config.IgnoredPlayersCheck and Config.IgnoredPlayers or {})
+        instance:SetPartFilter(getAimPartNameMap(), 'Allowlist')
+    end
+end
+
 local Window = Library:CreateWindow({
-    Title = 'Pure Open Aimbot',
+    Title = 'Pure Aimwork',
     Center = true,
     AutoShow = true,
     MenuFadeTime = 0.2,
@@ -762,7 +706,7 @@ PlayerList:AddDropdown('OA_PlayerDisposition', {
     end,
 })
 
-local AimbotTabbox = Tabs.Aimbot:AddLeftTabbox('Open Aimbot')
+local AimbotTabbox = Tabs.Aimbot:AddLeftTabbox('Aimwork')
 local AimBox = AimbotTabbox:AddTab('Aim')
 local MovementBox = AimbotTabbox:AddTab('Motion')
 local ChecksBox = AimbotTabbox:AddTab('Checks')
@@ -1068,8 +1012,8 @@ ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
 SaveManager:IgnoreThemeSettings()
 SaveManager:SetIgnoreIndexes({ 'MenuKeybind' })
-ThemeManager:SetFolder('PureOpenAimbot')
-SaveManager:SetFolder('PureOpenAimbot/' .. tostring(game.GameId))
+ThemeManager:SetFolder('PureAimwork')
+SaveManager:SetFolder('PureAimwork/' .. tostring(game.GameId))
 SaveManager:BuildConfigSection(Tabs['UI Settings'])
 ThemeManager:ApplyToTab(Tabs['UI Settings'])
 
@@ -1101,6 +1045,7 @@ table.insert(Connections, RunService.RenderStepped:Connect(function()
         return
     end
 
+    syncAimworkSettings()
     setDrawingFovVisible(Config.FoV)
     setTriggerFovVisible(Config.TriggerFoV)
     updateEsp()
@@ -1112,11 +1057,11 @@ table.insert(Connections, RunService.RenderStepped:Connect(function()
 
     Aiming = nextAiming
     Triggering = Config.TriggerBot and Options.OA_TriggerKey and Options.OA_TriggerKey:GetState() or false
+    local aimSelected = AimworkTarget:Iterate()
 
-    if Config.TriggerBot and Triggering and (not Config.SmartTriggerBot or Aiming) and getfenv().mouse1click and Mouse.Target then
-        local model = Mouse.Target:FindFirstAncestorOfClass('Model')
-        local ok, _, viewportPosition = resolveTarget(model)
-        if model and ok and targetInsideTriggerFov(viewportPosition) and chance(Config.TriggerBotChance) then
+    if Config.TriggerBot and Triggering and (not Config.SmartTriggerBot or Aiming) and getfenv().mouse1click then
+        local triggerSelected = AimworkTrigger:Iterate()
+        if selectedIsValid(triggerSelected) and targetInsideTriggerFov(triggerSelected.position) and chance(Config.TriggerBotChance) then
             getfenv().mouse1click()
         end
     end
@@ -1133,16 +1078,10 @@ table.insert(Connections, RunService.RenderStepped:Connect(function()
         return
     end
 
-    if not select(1, resolveTarget(Target)) then
-        if Target and Config.OffAimbotAfterKill then
-            resetAimbot()
-        else
-            Target = acquireTarget()
-        end
-    end
-
-    local ok, _, viewportPosition, inViewport, worldPosition = resolveTarget(Target)
-    if ok then
+    if selectedIsValid(aimSelected) then
+        Target = aimSelected.character
+        local worldPosition = getAimWorldPosition(aimSelected)
+        local viewportPosition, inViewport = Camera:WorldToViewportPoint(worldPosition)
         aimAt(worldPosition, viewportPosition, inViewport)
     else
         resetAimbot(true)
@@ -1155,6 +1094,8 @@ Library:OnUnload(function()
     resetAimbot()
     FovCircle:Destroy()
     TriggerFovCircle:Destroy()
+    AimworkTarget:Destroy()
+    AimworkTrigger:Destroy()
     clearEsp()
     pcall(function()
         TargetInfo:Destroy()
