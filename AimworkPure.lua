@@ -738,17 +738,17 @@ PlayerList:AddDropdown('OA_PlayerDisposition', {
     end,
 })
 
-local AimbotTabbox = Tabs.Aimbot:AddLeftTabbox('Aimwork')
-local TargetLockBox = AimbotTabbox:AddTab('Lock')
+local AimbotTabbox = Tabs.Aimbot:AddLeftTabbox('Aimbot')
+local TargetLockBox = AimbotTabbox:AddTab('Aim')
 local ChecksBox = AimbotTabbox:AddTab('Checks')
 local PartFilterBox = AimbotTabbox:AddTab('Parts')
-local IgnoredBox = AimbotTabbox:AddTab('Ignored')
+local IgnoredBox = AimbotTabbox:AddTab('Players')
 local FovBox = AimbotTabbox:AddTab('FOV')
-local ActuatorBox = AimbotTabbox:AddTab('Act')
+local ActuatorBox = AimbotTabbox:AddTab('Motion')
 local TriggerBox = Tabs.Aimbot:AddRightGroupbox('Triggerbot')
 
 local AimbotToggle = TargetLockBox:AddToggle('AW_Aimbot', {
-    Text = 'Aimwork',
+    Text = 'Enabled',
     Default = Config.Aimbot,
     Callback = function(value)
         Config.Aimbot = value
@@ -759,12 +759,12 @@ AimbotToggle:AddKeyPicker('AW_AimKey', {
     Default = Config.AimKey,
     Mode = 'Hold',
     Modes = { 'Always', 'Toggle', 'Hold' },
-    Text = 'Aimwork',
+    Text = 'Aim key',
     NoUI = false,
 })
 
 local TargetLockToggle = TargetLockBox:AddToggle('AW_TargetLockEnabled', {
-    Text = 'TargetLock.Enabled',
+    Text = 'Lock target',
     Default = Config.TargetLockEnabled,
     Callback = function(value)
         Config.TargetLockEnabled = value
@@ -777,22 +777,24 @@ TargetLockToggle:AddKeyPicker('AW_TargetLockKey', {
     Default = Config.TargetLockKey,
     Mode = 'Hold',
     Modes = { 'Hold' },
-    Text = 'TargetLock.Bind',
+    Text = 'Lock key',
     NoUI = false,
     Callback = function(value)
         Config.TargetLockKey = value
     end,
 })
 TargetLockBox:AddToggle('AW_TargetLockOnly', {
-    Text = 'TargetLock.LockOnly',
+    Text = 'Only aim locked target',
     Default = Config.TargetLockOnly,
     Callback = function(value) Config.TargetLockOnly = value end,
 })
 TargetLockBox:AddDropdown('AW_TargetLockMode', {
-    Text = 'TargetLock.Mode',
-    Values = { 'Lock', 'Unlock' },
-    Default = Config.TargetLockMode,
-    Callback = function(value) Config.TargetLockMode = value end,
+    Text = 'Lock key action',
+    Values = { 'Lock target', 'Clear lock' },
+    Default = Config.TargetLockMode == 'Unlock' and 'Clear lock' or 'Lock target',
+    Callback = function(value)
+        Config.TargetLockMode = value == 'Clear lock' and 'Unlock' or 'Lock'
+    end,
 })
 TargetLockBox:AddToggle('AW_OffAfterKill', {
     Text = 'Off after kill',
@@ -800,12 +802,12 @@ TargetLockBox:AddToggle('AW_OffAfterKill', {
     Callback = function(value) Config.OffAimbotAfterKill = value end,
 })
 
-ChecksBox:AddToggle('AW_CheckForceField', { Text = 'Checks.ForceField', Default = Config.ForceFieldCheck, Callback = function(value) Config.ForceFieldCheck = value end })
-ChecksBox:AddToggle('AW_CheckFriend', { Text = 'Checks.Friend', Default = Config.FriendCheck, Callback = function(value) Config.FriendCheck = value end })
-ChecksBox:AddToggle('AW_CheckDead', { Text = 'Checks.Dead', Default = Config.AliveCheck, Callback = function(value) Config.AliveCheck = value end })
-ChecksBox:AddToggle('AW_CheckInvisible', { Text = 'Checks.Invisible', Default = Config.TransparencyCheck, Callback = function(value) Config.TransparencyCheck = value end })
+ChecksBox:AddToggle('AW_CheckForceField', { Text = 'Ignore forcefields', Default = Config.ForceFieldCheck, Callback = function(value) Config.ForceFieldCheck = value end })
+ChecksBox:AddToggle('AW_CheckFriend', { Text = 'Ignore friends', Default = Config.FriendCheck, Callback = function(value) Config.FriendCheck = value end })
+ChecksBox:AddToggle('AW_CheckDead', { Text = 'Alive check', Default = Config.AliveCheck, Callback = function(value) Config.AliveCheck = value end })
+ChecksBox:AddToggle('AW_CheckInvisible', { Text = 'Transparency check', Default = Config.TransparencyCheck, Callback = function(value) Config.TransparencyCheck = value end })
 ChecksBox:AddSlider('AW_TransparencyLimit', {
-    Text = 'TransparencyLimit',
+    Text = 'Max transparency',
     Default = Config.IgnoredTransparency,
     Min = 0,
     Max = 1,
@@ -813,23 +815,29 @@ ChecksBox:AddSlider('AW_TransparencyLimit', {
     Callback = function(value) Config.IgnoredTransparency = value end,
 })
 ChecksBox:AddToggle('AW_CheckIgnored', {
-    Text = 'Checks.Ignored',
+    Text = 'Use player filters',
     Default = Config.IgnoredCheck,
     Callback = function(value) Config.IgnoredCheck = value end,
 })
 ChecksBox:AddDropdown('AW_WallCheck', {
-    Text = 'Checks.WallCheck',
-    Values = { 'Off', 'OnScreen', 'Full' },
-    Default = Config.WallCheck,
+    Text = 'Visibility check',
+    Values = { 'Off', 'On screen', 'Wall check' },
+    Default = Config.WallCheck == 'Full' and 'Wall check' or (Config.WallCheck == 'OnScreen' and 'On screen' or 'Off'),
     Callback = function(value)
-        Config.WallCheck = value
+        if value == 'Wall check' then
+            Config.WallCheck = 'Full'
+        elseif value == 'On screen' then
+            Config.WallCheck = 'OnScreen'
+        else
+            Config.WallCheck = 'Off'
+        end
     end,
 })
-ChecksBox:AddToggle('AW_CheckKO', { Text = 'Checks.K.O.', Default = Config.KOCheck, Callback = function(value) Config.KOCheck = value end })
-ChecksBox:AddToggle('AW_CheckHeld', { Text = 'Checks.Held', Default = Config.HeldCheck, Callback = function(value) Config.HeldCheck = value end })
-ChecksBox:AddToggle('AW_CheckMagnitude', { Text = 'Checks.Magnitude', Default = Config.MagnitudeCheck, Callback = function(value) Config.MagnitudeCheck = value end })
+ChecksBox:AddToggle('AW_CheckKO', { Text = 'K.O. check', Default = Config.KOCheck, Callback = function(value) Config.KOCheck = value end })
+ChecksBox:AddToggle('AW_CheckHeld', { Text = 'Held check', Default = Config.HeldCheck, Callback = function(value) Config.HeldCheck = value end })
+ChecksBox:AddToggle('AW_CheckMagnitude', { Text = 'Distance check', Default = Config.MagnitudeCheck, Callback = function(value) Config.MagnitudeCheck = value end })
 ChecksBox:AddSlider('AW_MaxMagnitude', {
-    Text = 'MaxMagnitude',
+    Text = 'Max distance',
     Default = Config.TriggerMagnitude,
     Min = 25,
     Max = 2000,
@@ -838,10 +846,12 @@ ChecksBox:AddSlider('AW_MaxMagnitude', {
 })
 
 PartFilterBox:AddDropdown('AW_PartFilterType', {
-    Text = 'PartFilter.Type',
-    Values = { 'Allowlist', 'Blocklist' },
-    Default = Config.PartFilterType,
-    Callback = function(value) Config.PartFilterType = value end,
+    Text = 'Aim part mode',
+    Values = { 'Selected parts only', 'Ignore selected parts' },
+    Default = Config.PartFilterType == 'Blocklist' and 'Ignore selected parts' or 'Selected parts only',
+    Callback = function(value)
+        Config.PartFilterType = value == 'Ignore selected parts' and 'Blocklist' or 'Allowlist'
+    end,
 })
 PartFilterBox:AddBodySelector('AW_AimParts', {
     Default = Config.AimParts,
@@ -852,12 +862,12 @@ PartFilterBox:AddBodySelector('AW_AimParts', {
 })
 
 IgnoredBox:AddToggle('AW_IgnoreLocalTeam', {
-    Text = 'Ignored.IgnoreLocalTeam',
+    Text = 'Ignore team',
     Default = Config.TeamCheck,
     Callback = function(value) Config.TeamCheck = value end,
 })
 IgnoredBox:AddToggle('AW_PlayerAllowlist', {
-    Text = 'Allowlist.Players',
+    Text = 'Only target enemies',
     Default = Config.TargetPlayersCheck,
     Callback = function(value)
         Config.TargetPlayersCheck = value
@@ -865,7 +875,7 @@ IgnoredBox:AddToggle('AW_PlayerAllowlist', {
     end,
 })
 IgnoredBox:AddToggle('AW_PlayerBlocklist', {
-    Text = 'Blocklist.Players',
+    Text = 'Ignore whitelisted',
     Default = Config.IgnoredPlayersCheck,
     Callback = function(value)
         Config.IgnoredPlayersCheck = value
@@ -874,18 +884,18 @@ IgnoredBox:AddToggle('AW_PlayerBlocklist', {
 })
 
 ActuatorBox:AddDropdown('AW_Actuator', {
-    Text = 'Pure actuator',
+    Text = 'Aim method',
     Values = getfenv().mousemoverel and { 'Camera', 'Mouse' } or { 'Camera' },
     Default = Config.Actuator,
     Callback = function(value) Config.Actuator = value end,
 })
 ActuatorBox:AddToggle('AW_UseSensitivity', {
-    Text = 'Smooth actuator',
+    Text = 'Smooth aim',
     Default = Config.UseSensitivity,
     Callback = function(value) Config.UseSensitivity = value end,
 })
 ActuatorBox:AddSlider('AW_Sensitivity', {
-    Text = 'Actuator smoothing',
+    Text = 'Smoothing',
     Default = Config.Sensitivity,
     Min = 9,
     Max = 99,
@@ -893,7 +903,7 @@ ActuatorBox:AddSlider('AW_Sensitivity', {
     Callback = function(value) Config.Sensitivity = value end,
 })
 ActuatorBox:AddToggle('AW_UseOffset', {
-    Text = 'World offset',
+    Text = 'Aim offset',
     Default = Config.UseOffset,
     Callback = function(value) Config.UseOffset = value end,
 })
@@ -920,7 +930,7 @@ ActuatorBox:AddSlider('AW_DynamicOffset', {
     Callback = function(value) Config.DynamicOffsetIncrement = value end,
 })
 ActuatorBox:AddToggle('AW_Noise', {
-    Text = 'Actuator noise',
+    Text = 'Aim noise',
     Default = Config.UseNoise,
     Callback = function(value) Config.UseNoise = value end,
 })
