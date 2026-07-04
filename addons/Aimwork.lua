@@ -318,7 +318,31 @@ function Aimwork:SetPartFilter(names, filterType)
 end
 
 function Aimwork:LockTarget()
-    self:Iterate()
+    local lockSettings = self.settings.TargetLock
+    local wasLockOnly = lockSettings.LockOnly
+    local isLockMode = lockSettings.Mode == 'Lock'
+
+    if wasLockOnly or isLockMode then
+        if wasLockOnly then
+            lockSettings.LockOnly = false
+        end
+
+        if isLockMode then
+            self._lockTarget = nil
+        end
+
+        self:Iterate()
+
+        if wasLockOnly then
+            lockSettings.LockOnly = true
+        end
+    else
+        self:Iterate()
+    end
+
+    if self._lockTarget then
+        return
+    end
 
     if self.selected.player ~= LocalPlayer then
         local _, playerObject = self:GetPlayerObject(self.selected.player)
