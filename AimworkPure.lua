@@ -18,13 +18,11 @@ local Aimwork = loadstring(game:HttpGet(repo .. 'addons/Aimwork.lua' .. cacheBus
 local Players = game:GetService('Players')
 local UserInputService = game:GetService('UserInputService')
 local RunService = game:GetService('RunService')
-local TweenService = game:GetService('TweenService')
 
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 local Camera = workspace.CurrentCamera
 local IsComputer = UserInputService.KeyboardEnabled and UserInputService.MouseEnabled
-local MouseSensitivity = UserInputService.MouseDeltaSensitivity
 
 local Config = {
     Aimbot = false,
@@ -33,10 +31,7 @@ local Config = {
     OffAimbotAfterKill = false,
     AimParts = { Torso = true },
     PartFilterType = 'Allowlist',
-    TargetLockEnabled = false,
-    TargetLockOnly = false,
-    TargetLockMode = 'Lock',
-    TargetLockKey = 'F1',
+    StickyAim = false,
 
     UseOffset = false,
     OffsetType = 'Static',
@@ -47,20 +42,9 @@ local Config = {
 
     UseSensitivity = true,
     Sensitivity = 50,
+    SmoothingType = 'Linear',
     UseNoise = false,
     NoiseFrequency = 10,
-
-    TriggerBot = false,
-    TriggerKey = 'E',
-    TriggerBotChance = 100,
-    SmartTriggerBot = true,
-    TriggerFoV = false,
-    TriggerFoVCheck = false,
-    TriggerFoVRadius = 80,
-    TriggerFoVThickness = 1.5,
-    TriggerFoVColour = Color3.fromRGB(245, 245, 245),
-    TriggerFoVAccent = Color3.fromRGB(120, 170, 255),
-    TriggerFoVGlow = true,
 
     AliveCheck = true,
     TeamCheck = false,
@@ -73,7 +57,7 @@ local Config = {
     FoVCheck = true,
     FoVRadius = 120,
     MagnitudeCheck = false,
-    TriggerMagnitude = 500,
+    MaxDistance = 500,
     TransparencyCheck = false,
     IgnoredTransparency = 0.5,
     TargetPlayersCheck = false,
@@ -88,6 +72,7 @@ local Config = {
     FoVAccent = Color3.fromRGB(216, 114, 150),
     FoVGlow = true,
     FoVSmoothing = 0.12,
+    FoVSweepSize = 0.16,
 
     ESP = false,
     ESPBox = true,
@@ -102,19 +87,15 @@ local Config = {
 }
 
 local Aiming = false
-local Triggering = false
 local Target = nil
-local Tween = nil
 local LastTargetLockKey = false
 local Connections = {}
 local EspObjects = {}
+local EspAccumulator = 0
+local EspHidden = true
 
 local function notify(message)
     Library:Notify('[Aimwork] ' .. message, 2)
-end
-
-local function chance(percent)
-    return math.random(1, 100) <= math.clamp(math.floor(percent), 1, 100)
 end
 
 local function localCharacter()
@@ -196,13 +177,24 @@ end
 local function resetAimbot(saveAiming, saveTarget)
     Aiming = saveAiming and Aiming or false
     Target = saveTarget and Target or nil
+end
 
-    if Tween then
-        Tween:Cancel()
-        Tween = nil
+local function getAimAlpha(delta)
+    if not Config.UseSensitivity then
+        return 1
     end
 
-    UserInputService.MouseDeltaSensitivity = MouseSensitivity
+    local smoothing = math.clamp((tonumber(Config.Sensitivity) or 50) / 100, 0, 0.98)
+    local alpha = math.clamp(1 - smoothing, 0.02, 1)
+    alpha = 1 - math.pow(1 - alpha, math.max((delta or 0) * 60, 1))
+
+    if Config.SmoothingType == 'Ease out' then
+        alpha = 1 - math.pow(1 - alpha, 2)
+    elseif Config.SmoothingType == 'Ease in out' then
+        alpha = alpha < 0.5 and 2 * alpha * alpha or 1 - math.pow(-2 * alpha + 2, 2) / 2
+    end
+
+    return math.clamp(alpha, 0.02, 1)
 end
 
 local function getAimWorldPosition(selected)
@@ -238,29 +230,20 @@ local function getAimWorldPosition(selected)
     return worldPosition + offset + noise
 end
 
-local function applyAimActuation(worldPosition, viewportPosition, inViewport)
+local function applyAimActuation(worldPosition, viewportPosition, inViewport, delta)
+    local alpha = getAimAlpha(delta)
+
     if Config.Actuator == 'Mouse' and getfenv().mousemoverel and IsComputer then
         if inViewport then
             local mouseLocation = UserInputService:GetMouseLocation()
-            local sensitivity = Config.UseSensitivity and Config.Sensitivity / 5 or 10
-            getfenv().mousemoverel((viewportPosition.X - mouseLocation.X) / sensitivity, (viewportPosition.Y - mouseLocation.Y) / sensitivity)
+            local delta2 = Vector2.new(viewportPosition.X, viewportPosition.Y) - mouseLocation
+            getfenv().mousemoverel(delta2.X * alpha, delta2.Y * alpha)
         end
         return
     end
 
-    UserInputService.MouseDeltaSensitivity = 0
     local targetCFrame = CFrame.new(Camera.CFrame.Position, worldPosition)
-    if Config.UseSensitivity then
-        if Tween then
-            Tween:Cancel()
-        end
-        Tween = TweenService:Create(Camera, TweenInfo.new(math.clamp(Config.Sensitivity, 9, 99) / 100, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {
-            CFrame = targetCFrame,
-        })
-        Tween:Play()
-    else
-        Camera.CFrame = targetCFrame
-    end
+    Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, alpha)
 end
 
 local FovCircle = Library:CreateFovCircle({
@@ -273,18 +256,7 @@ local FovCircle = Library:CreateFovCircle({
     Filled = Config.FoVFilled,
     Glow = Config.FoVGlow,
     Smoothing = Config.FoVSmoothing,
-})
-
-local TriggerFovCircle = Library:CreateFovCircle({
-    Visible = false,
-    Radius = Config.TriggerFoVRadius,
-    Sides = 72,
-    Color = Config.TriggerFoVColour,
-    AccentColor = Config.TriggerFoVAccent,
-    Thickness = Config.TriggerFoVThickness,
-    Filled = false,
-    Glow = Config.TriggerFoVGlow,
-    Smoothing = Config.FoVSmoothing,
+    SweepSize = Config.FoVSweepSize,
 })
 
 local function newDrawing(kind)
@@ -383,6 +355,19 @@ local function updateEsp()
         return
     end
 
+    if not Config.ESP then
+        if not EspHidden then
+            for _, set in pairs(EspObjects) do
+                for _, drawing in pairs(set) do
+                    drawing.Visible = false
+                end
+            end
+            EspHidden = true
+        end
+        return
+    end
+    EspHidden = false
+
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
             local set = getEsp(player)
@@ -392,7 +377,7 @@ local function updateEsp()
             local humanoid = character and character:FindFirstChildOfClass('Humanoid')
             local show = false
 
-            if Config.ESP and character and head and root and humanoid then
+            if character and head and root and humanoid then
                 local ready = true
                 local rootPos, inViewport = Camera:WorldToViewportPoint(root.Position)
                 local headPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
@@ -461,19 +446,6 @@ local function setDrawingFovVisible(value)
     FovCircle:SetVisible(value and Config.FoV)
 end
 
-local function setTriggerFovVisible(value)
-    TriggerFovCircle:SetVisible(value and Config.TriggerFoV and Config.TriggerBot)
-end
-
-local function targetInsideTriggerFov(viewportPosition)
-    if not Config.TriggerFoVCheck then
-        return true
-    end
-
-    local mousePosition = UserInputService:GetMouseLocation()
-    return (Vector2.new(viewportPosition.X, viewportPosition.Y) - mousePosition).Magnitude <= Config.TriggerFoVRadius
-end
-
 local function makeMouseFov(id, radiusGetter, enabledGetter)
     return {
         id = id,
@@ -517,10 +489,10 @@ end
 local function buildAimworkSettings()
     return {
         TargetLock = {
-            Enabled = Config.TargetLockEnabled,
-            LockOnly = Config.TargetLockOnly,
-            Mode = Config.TargetLockMode,
-            Bind = keyNameToInput(Config.TargetLockKey),
+            Enabled = Config.StickyAim,
+            LockOnly = false,
+            Mode = 'Lock',
+            Bind = keyNameToInput(Config.AimKey),
         },
         Checks = {
             ForceField = Config.ForceFieldCheck,
@@ -529,7 +501,7 @@ local function buildAimworkSettings()
             Invisible = Config.TransparencyCheck,
             TransparencyLimit = Config.IgnoredTransparency,
             Magnitude = Config.MagnitudeCheck,
-            MaxMagnitude = Config.TriggerMagnitude,
+            MaxMagnitude = Config.MaxDistance,
             Ignored = Config.IgnoredCheck,
             WallCheck = Config.WallCheck == 'Off' and false or Config.WallCheck,
             KO = Config.KOCheck,
@@ -552,7 +524,6 @@ local function buildAimworkSettings()
 end
 
 local AimworkTarget = Aimwork.new(buildAimworkSettings())
-local AimworkTrigger = Aimwork.new(buildAimworkSettings())
 
 local AimFovObject = makeMouseFov('AimFOV', function()
     return Config.FoVRadius
@@ -560,44 +531,30 @@ end, function()
     return Config.FoVCheck
 end)
 
-local TriggerFovObject = makeMouseFov('TriggerFOV', function()
-    return Config.TriggerFoVRadius
-end, function()
-    return Config.TriggerFoVCheck
-end)
-
 AimworkTarget:RegisterCustomFov(AimFovObject)
-AimworkTrigger:RegisterCustomFov(TriggerFovObject)
 
 local function syncAimworkSettings()
-    for _, instance in ipairs({ AimworkTarget, AimworkTrigger }) do
-        local settings = instance.settings
-        if instance == AimworkTarget then
-            settings.TargetLock.Enabled = Config.TargetLockEnabled
-            settings.TargetLock.LockOnly = Config.TargetLockOnly
-            settings.TargetLock.Mode = Config.TargetLockMode
-            settings.TargetLock.Bind = keyNameToInput(Config.TargetLockKey)
-        else
-            settings.TargetLock.Enabled = false
-            settings.TargetLock.LockOnly = false
-            settings.TargetLock.Mode = 'Lock'
-        end
-        settings.Checks.ForceField = Config.ForceFieldCheck
-        settings.Checks.Friend = Config.FriendCheck
-        settings.Checks.Dead = Config.AliveCheck
-        settings.Checks.Invisible = Config.TransparencyCheck
-        settings.Checks.TransparencyLimit = Config.IgnoredTransparency
-        settings.Checks.Magnitude = Config.MagnitudeCheck
-        settings.Checks.MaxMagnitude = Config.TriggerMagnitude
-        settings.Checks.Ignored = Config.IgnoredCheck
-        settings.Checks.WallCheck = Config.WallCheck == 'Off' and false or Config.WallCheck
-        settings.Checks.KO = Config.KOCheck
-        settings.Checks.Held = Config.HeldCheck
-        settings.Ignored.IgnoreLocalTeam = Config.TeamCheck
-        settings.Ignored.AllowlistEnabledFor.Players = Config.TargetPlayersCheck
-        settings.Ignored.Players = Config.TargetPlayersCheck and Config.TargetPlayers or (Config.IgnoredPlayersCheck and Config.IgnoredPlayers or {})
-        instance:SetPartFilter(getAimPartNameMap(), Config.PartFilterType)
-    end
+    local instance = AimworkTarget
+    local settings = instance.settings
+    settings.TargetLock.Enabled = Config.StickyAim
+    settings.TargetLock.LockOnly = Config.StickyAim
+    settings.TargetLock.Mode = 'Lock'
+    settings.TargetLock.Bind = keyNameToInput(Config.AimKey)
+    settings.Checks.ForceField = Config.ForceFieldCheck
+    settings.Checks.Friend = Config.FriendCheck
+    settings.Checks.Dead = Config.AliveCheck
+    settings.Checks.Invisible = Config.TransparencyCheck
+    settings.Checks.TransparencyLimit = Config.IgnoredTransparency
+    settings.Checks.Magnitude = Config.MagnitudeCheck
+    settings.Checks.MaxMagnitude = Config.MaxDistance
+    settings.Checks.Ignored = Config.IgnoredCheck
+    settings.Checks.WallCheck = Config.WallCheck == 'Off' and false or Config.WallCheck
+    settings.Checks.KO = Config.KOCheck
+    settings.Checks.Held = Config.HeldCheck
+    settings.Ignored.IgnoreLocalTeam = Config.TeamCheck
+    settings.Ignored.AllowlistEnabledFor.Players = Config.TargetPlayersCheck
+    settings.Ignored.Players = Config.TargetPlayersCheck and Config.TargetPlayers or (Config.IgnoredPlayersCheck and Config.IgnoredPlayers or {})
+    instance:SetPartFilter(getAimPartNameMap(), Config.PartFilterType)
 end
 
 local Window = Library:CreateWindow({
@@ -739,16 +696,13 @@ PlayerList:AddDropdown('OA_PlayerDisposition', {
 })
 
 local AimbotTabbox = Tabs.Aimbot:AddLeftTabbox('Aimbot')
-local TargetLockBox = AimbotTabbox:AddTab('Aim')
-local ChecksBox = AimbotTabbox:AddTab('Checks')
-local PartFilterBox = AimbotTabbox:AddTab('Parts')
-local IgnoredBox = AimbotTabbox:AddTab('Players')
+local AimBox = AimbotTabbox:AddTab('Aim')
+local PartFilterBox = AimbotTabbox:AddTab('Aim Part')
 local FovBox = AimbotTabbox:AddTab('FOV')
-local ActuatorBox = AimbotTabbox:AddTab('Motion')
-local TriggerBox = Tabs.Aimbot:AddRightGroupbox('Triggerbot')
+local ChecksBox = AimbotTabbox:AddTab('Checks')
 
-local AimbotToggle = TargetLockBox:AddToggle('AW_Aimbot', {
-    Text = 'Enabled',
+local AimbotToggle = AimBox:AddToggle('AW_Aimbot', {
+    Text = 'Aimbot',
     Default = Config.Aimbot,
     Callback = function(value)
         Config.Aimbot = value
@@ -758,269 +712,57 @@ local AimbotToggle = TargetLockBox:AddToggle('AW_Aimbot', {
 AimbotToggle:AddKeyPicker('AW_AimKey', {
     Default = Config.AimKey,
     Mode = 'Hold',
-    Modes = { 'Always', 'Toggle', 'Hold' },
-    Text = 'Aim key',
+    Modes = { 'Hold' },
+    Text = 'Target select',
     NoUI = false,
+    Callback = function(value)
+        Config.AimKey = value
+    end,
 })
 
-local TargetLockToggle = TargetLockBox:AddToggle('AW_TargetLockEnabled', {
-    Text = 'Lock target',
-    Default = Config.TargetLockEnabled,
+AimBox:AddToggle('AW_StickyAim', {
+    Text = 'Sticky aim',
+    Default = Config.StickyAim,
     Callback = function(value)
-        Config.TargetLockEnabled = value
+        Config.StickyAim = value
         if not value then
             AimworkTarget._lockTarget = nil
         end
     end,
 })
-TargetLockToggle:AddKeyPicker('AW_TargetLockKey', {
-    Default = Config.TargetLockKey,
-    Mode = 'Hold',
-    Modes = { 'Hold' },
-    Text = 'Lock key',
-    NoUI = false,
-    Callback = function(value)
-        Config.TargetLockKey = value
-    end,
-})
-TargetLockBox:AddToggle('AW_TargetLockOnly', {
-    Text = 'Only aim locked target',
-    Default = Config.TargetLockOnly,
-    Callback = function(value) Config.TargetLockOnly = value end,
-})
-TargetLockBox:AddDropdown('AW_TargetLockMode', {
-    Text = 'Lock key action',
-    Values = { 'Lock target', 'Clear lock' },
-    Default = Config.TargetLockMode == 'Unlock' and 'Clear lock' or 'Lock target',
-    Callback = function(value)
-        Config.TargetLockMode = value == 'Clear lock' and 'Unlock' or 'Lock'
-    end,
-})
-TargetLockBox:AddToggle('AW_OffAfterKill', {
-    Text = 'Off after kill',
-    Default = Config.OffAimbotAfterKill,
-    Callback = function(value) Config.OffAimbotAfterKill = value end,
-})
 
-ChecksBox:AddToggle('AW_CheckForceField', { Text = 'Ignore forcefields', Default = Config.ForceFieldCheck, Callback = function(value) Config.ForceFieldCheck = value end })
-ChecksBox:AddToggle('AW_CheckFriend', { Text = 'Ignore friends', Default = Config.FriendCheck, Callback = function(value) Config.FriendCheck = value end })
-ChecksBox:AddToggle('AW_CheckDead', { Text = 'Alive check', Default = Config.AliveCheck, Callback = function(value) Config.AliveCheck = value end })
-ChecksBox:AddToggle('AW_CheckInvisible', { Text = 'Transparency check', Default = Config.TransparencyCheck, Callback = function(value) Config.TransparencyCheck = value end })
-ChecksBox:AddSlider('AW_TransparencyLimit', {
-    Text = 'Max transparency',
-    Default = Config.IgnoredTransparency,
-    Min = 0,
-    Max = 1,
-    Rounding = 2,
-    Callback = function(value) Config.IgnoredTransparency = value end,
-})
-ChecksBox:AddToggle('AW_CheckIgnored', {
-    Text = 'Use player filters',
-    Default = Config.IgnoredCheck,
-    Callback = function(value) Config.IgnoredCheck = value end,
-})
-ChecksBox:AddDropdown('AW_WallCheck', {
-    Text = 'Visibility check',
-    Values = { 'Off', 'On screen', 'Wall check' },
-    Default = Config.WallCheck == 'Full' and 'Wall check' or (Config.WallCheck == 'OnScreen' and 'On screen' or 'Off'),
-    Callback = function(value)
-        if value == 'Wall check' then
-            Config.WallCheck = 'Full'
-        elseif value == 'On screen' then
-            Config.WallCheck = 'OnScreen'
-        else
-            Config.WallCheck = 'Off'
-        end
-    end,
-})
-ChecksBox:AddToggle('AW_CheckKO', { Text = 'K.O. check', Default = Config.KOCheck, Callback = function(value) Config.KOCheck = value end })
-ChecksBox:AddToggle('AW_CheckHeld', { Text = 'Held check', Default = Config.HeldCheck, Callback = function(value) Config.HeldCheck = value end })
-ChecksBox:AddToggle('AW_CheckMagnitude', { Text = 'Distance check', Default = Config.MagnitudeCheck, Callback = function(value) Config.MagnitudeCheck = value end })
-ChecksBox:AddSlider('AW_MaxMagnitude', {
-    Text = 'Max distance',
-    Default = Config.TriggerMagnitude,
-    Min = 25,
-    Max = 2000,
-    Rounding = 0,
-    Callback = function(value) Config.TriggerMagnitude = value end,
-})
-
-PartFilterBox:AddDropdown('AW_PartFilterType', {
-    Text = 'Aim part mode',
-    Values = { 'Selected parts only', 'Ignore selected parts' },
-    Default = Config.PartFilterType == 'Blocklist' and 'Ignore selected parts' or 'Selected parts only',
-    Callback = function(value)
-        Config.PartFilterType = value == 'Ignore selected parts' and 'Blocklist' or 'Allowlist'
-    end,
-})
-PartFilterBox:AddBodySelector('AW_AimParts', {
-    Default = Config.AimParts,
-    Height = 186,
-    Callback = function(value)
-        normalizeAimParts(value)
-    end,
-})
-
-IgnoredBox:AddToggle('AW_IgnoreLocalTeam', {
-    Text = 'Ignore team',
-    Default = Config.TeamCheck,
-    Callback = function(value) Config.TeamCheck = value end,
-})
-IgnoredBox:AddToggle('AW_PlayerAllowlist', {
-    Text = 'Only target enemies',
-    Default = Config.TargetPlayersCheck,
-    Callback = function(value)
-        Config.TargetPlayersCheck = value
-        if value then Config.IgnoredPlayersCheck = false end
-    end,
-})
-IgnoredBox:AddToggle('AW_PlayerBlocklist', {
-    Text = 'Ignore whitelisted',
-    Default = Config.IgnoredPlayersCheck,
-    Callback = function(value)
-        Config.IgnoredPlayersCheck = value
-        if value then Config.TargetPlayersCheck = false end
-    end,
-})
-
-ActuatorBox:AddDropdown('AW_Actuator', {
+AimBox:AddDropdown('AW_Actuator', {
     Text = 'Aim method',
-    Values = getfenv().mousemoverel and { 'Camera', 'Mouse' } or { 'Camera' },
+    Values = getfenv().mousemoverel and { 'Mouse', 'Camera' } or { 'Camera' },
     Default = Config.Actuator,
     Callback = function(value) Config.Actuator = value end,
 })
-ActuatorBox:AddToggle('AW_UseSensitivity', {
+
+AimBox:AddToggle('AW_UseSensitivity', {
     Text = 'Smooth aim',
     Default = Config.UseSensitivity,
     Callback = function(value) Config.UseSensitivity = value end,
 })
-ActuatorBox:AddSlider('AW_Sensitivity', {
+AimBox:AddSlider('AW_Sensitivity', {
     Text = 'Smoothing',
     Default = Config.Sensitivity,
-    Min = 9,
-    Max = 99,
+    Min = 0,
+    Max = 98,
     Rounding = 0,
     Callback = function(value) Config.Sensitivity = value end,
 })
-ActuatorBox:AddToggle('AW_UseOffset', {
-    Text = 'Aim offset',
-    Default = Config.UseOffset,
-    Callback = function(value) Config.UseOffset = value end,
-})
-ActuatorBox:AddDropdown('AW_OffsetType', {
-    Text = 'Offset type',
-    Values = { 'Static', 'Dynamic', 'Both' },
-    Default = Config.OffsetType,
-    Callback = function(value) Config.OffsetType = value end,
-})
-ActuatorBox:AddSlider('AW_StaticOffset', {
-    Text = 'Static offset',
-    Default = Config.StaticOffsetIncrement,
-    Min = -50,
-    Max = 50,
-    Rounding = 0,
-    Callback = function(value) Config.StaticOffsetIncrement = value end,
-})
-ActuatorBox:AddSlider('AW_DynamicOffset', {
-    Text = 'Dynamic offset',
-    Default = Config.DynamicOffsetIncrement,
-    Min = -50,
-    Max = 50,
-    Rounding = 0,
-    Callback = function(value) Config.DynamicOffsetIncrement = value end,
-})
-ActuatorBox:AddToggle('AW_Noise', {
-    Text = 'Aim noise',
-    Default = Config.UseNoise,
-    Callback = function(value) Config.UseNoise = value end,
-})
-ActuatorBox:AddSlider('AW_NoiseFrequency', {
-    Text = 'Noise amount',
-    Default = Config.NoiseFrequency,
-    Min = 0,
-    Max = 100,
-    Rounding = 0,
-    Callback = function(value) Config.NoiseFrequency = value end,
+AimBox:AddDropdown('AW_SmoothingType', {
+    Text = 'Smoothing type',
+    Values = { 'Linear', 'Ease out', 'Ease in out' },
+    Default = Config.SmoothingType,
+    Callback = function(value) Config.SmoothingType = value end,
 })
 
-local TriggerToggle = TriggerBox:AddToggle('AW_TriggerBot', {
-    Text = 'Triggerbot',
-    Default = Config.TriggerBot,
+PartFilterBox:AddBodySelector('AW_AimParts', {
+    Default = Config.AimParts,
+    Height = 204,
     Callback = function(value)
-        Config.TriggerBot = value
-        if not value then Triggering = false end
-        setTriggerFovVisible(Config.TriggerFoV)
-    end,
-})
-TriggerToggle:AddKeyPicker('AW_TriggerKey', {
-    Default = Config.TriggerKey,
-    Mode = 'Toggle',
-    Modes = { 'Always', 'Toggle', 'Hold' },
-    Text = 'Triggerbot',
-    NoUI = false,
-})
-TriggerBox:AddToggle('AW_SmartTrigger', {
-    Text = 'Only while aiming',
-    Default = Config.SmartTriggerBot,
-    Callback = function(value) Config.SmartTriggerBot = value end,
-})
-TriggerBox:AddSlider('AW_TriggerChance', {
-    Text = 'Click chance',
-    Default = Config.TriggerBotChance,
-    Min = 1,
-    Max = 100,
-    Rounding = 0,
-    Callback = function(value) Config.TriggerBotChance = value end,
-})
-TriggerBox:AddToggle('AW_TriggerFovCheck', {
-    Text = 'FOV check',
-    Default = Config.TriggerFoVCheck,
-    Callback = function(value) Config.TriggerFoVCheck = value end,
-})
-TriggerBox:AddToggle('AW_TriggerFovVisible', {
-    Text = 'Show FOV',
-    Default = Config.TriggerFoV,
-    Callback = function(value)
-        Config.TriggerFoV = value
-        setTriggerFovVisible(value)
-    end,
-})
-TriggerBox:AddSlider('AW_TriggerFovRadius', {
-    Text = 'FOV radius',
-    Default = Config.TriggerFoVRadius,
-    Min = 20,
-    Max = 500,
-    Rounding = 0,
-    Callback = function(value)
-        Config.TriggerFoVRadius = value
-        TriggerFovCircle:Set('Radius', value)
-    end,
-})
-TriggerBox:AddSlider('AW_TriggerFovThickness', {
-    Text = 'FOV thickness',
-    Default = Config.TriggerFoVThickness,
-    Min = 1,
-    Max = 5,
-    Rounding = 1,
-    Callback = function(value)
-        Config.TriggerFoVThickness = value
-        TriggerFovCircle:Set('Thickness', value)
-    end,
-})
-TriggerBox:AddLabel('FOV color'):AddColorPicker('AW_TriggerFovColor', {
-    Default = Config.TriggerFoVColour,
-    Title = 'Trigger FOV color',
-    Callback = function(value)
-        Config.TriggerFoVColour = value
-        TriggerFovCircle:Set('Color', value)
-    end,
-})
-TriggerBox:AddLabel('FOV accent'):AddColorPicker('AW_TriggerFovAccent', {
-    Default = Config.TriggerFoVAccent,
-    Title = 'Trigger FOV accent',
-    Callback = function(value)
-        Config.TriggerFoVAccent = value
-        TriggerFovCircle:Set('AccentColor', value)
+        normalizeAimParts(value)
     end,
 })
 
@@ -1071,6 +813,17 @@ FovBox:AddSlider('AW_FovThickness', {
         FovCircle:Set('Thickness', value)
     end,
 })
+FovBox:AddSlider('AW_FovSweepSize', {
+    Text = 'Accent length',
+    Default = Config.FoVSweepSize,
+    Min = 0.04,
+    Max = 0.5,
+    Rounding = 2,
+    Callback = function(value)
+        Config.FoVSweepSize = value
+        FovCircle:Set('SweepSize', value)
+    end,
+})
 FovBox:AddSlider('AW_FovSmoothing', {
     Text = 'Mouse smoothing',
     Default = Config.FoVSmoothing,
@@ -1098,6 +851,22 @@ FovBox:AddLabel('Accent color'):AddColorPicker('AW_FovAccent', {
         FovCircle:Set('AccentColor', value)
     end,
 })
+
+ChecksBox:AddToggle('AW_CheckDead', { Text = 'Alive check', Default = Config.AliveCheck, Callback = function(value) Config.AliveCheck = value end })
+ChecksBox:AddToggle('AW_CheckForceField', { Text = 'Forcefield check', Default = Config.ForceFieldCheck, Callback = function(value) Config.ForceFieldCheck = value end })
+ChecksBox:AddToggle('AW_CheckKO', { Text = 'K.O. check', Default = Config.KOCheck, Callback = function(value) Config.KOCheck = value end })
+ChecksBox:AddToggle('AW_CheckHeld', { Text = 'Held check', Default = Config.HeldCheck, Callback = function(value) Config.HeldCheck = value end })
+local DistanceToggle = ChecksBox:AddToggle('AW_CheckMagnitude', { Text = 'Distance check', Default = Config.MagnitudeCheck, Callback = function(value) Config.MagnitudeCheck = value end })
+local DistanceDependency = ChecksBox:AddDependencyBox()
+DistanceDependency:AddSlider('AW_MaxMagnitude', {
+    Text = 'Max distance',
+    Default = Config.MaxDistance,
+    Min = 25,
+    Max = 2000,
+    Rounding = 0,
+    Callback = function(value) Config.MaxDistance = value end,
+})
+DistanceDependency:SetupDependencies({ { DistanceToggle, true } })
 
 local EspBox = Tabs.Visuals:AddLeftGroupbox('ESP')
 EspBox:AddToggle('OA_ESP', { Text = 'Enable ESP', Default = Config.ESP, Callback = function(value) Config.ESP = value end })
@@ -1157,7 +926,7 @@ table.insert(Connections, Players.PlayerRemoving:Connect(function(player)
     end
 end))
 
-table.insert(Connections, RunService.RenderStepped:Connect(function()
+table.insert(Connections, RunService.RenderStepped:Connect(function(Delta)
     Camera = workspace.CurrentCamera
     if not Camera or Library.Unloaded then
         return
@@ -1165,34 +934,25 @@ table.insert(Connections, RunService.RenderStepped:Connect(function()
 
     syncAimworkSettings()
     setDrawingFovVisible(Config.FoV)
-    setTriggerFovVisible(Config.TriggerFoV)
-    updateEsp()
+    EspAccumulator = EspAccumulator + Delta
+    if EspAccumulator >= 0.05 then
+        EspAccumulator = 0
+        updateEsp()
+    end
 
-    local lockKeyDown = Config.TargetLockEnabled and Options.AW_TargetLockKey and Options.AW_TargetLockKey:GetState() or false
+    local lockKeyDown = Config.Aimbot and Config.StickyAim and Options.AW_AimKey and Options.AW_AimKey:GetState() or false
     if lockKeyDown and not LastTargetLockKey then
-        if Config.TargetLockMode == 'Unlock' then
-            AimworkTarget._lockTarget = nil
-        else
-            AimworkTarget:LockTarget()
-        end
+        AimworkTarget:LockTarget()
     end
     LastTargetLockKey = lockKeyDown
 
-    local nextAiming = Config.Aimbot and Options.AW_AimKey and Options.AW_AimKey:GetState() or false
+    local nextAiming = Config.Aimbot
     if Aiming and not nextAiming then
         resetAimbot()
     end
 
     Aiming = nextAiming
-    Triggering = Config.TriggerBot and Options.AW_TriggerKey and Options.AW_TriggerKey:GetState() or false
     local aimSelected = AimworkTarget:Iterate()
-
-    if Config.TriggerBot and Triggering and (not Config.SmartTriggerBot or Aiming) and getfenv().mouse1click then
-        local triggerSelected = AimworkTrigger:Iterate()
-        if selectedIsValid(triggerSelected) and targetInsideTriggerFov(triggerSelected.position) and chance(Config.TriggerBotChance) then
-            getfenv().mouse1click()
-        end
-    end
 
     if not Config.Aimbot then
         if Aiming then resetAimbot() end
@@ -1210,7 +970,7 @@ table.insert(Connections, RunService.RenderStepped:Connect(function()
         Target = aimSelected.character
         local worldPosition = getAimWorldPosition(aimSelected)
         local viewportPosition, inViewport = Camera:WorldToViewportPoint(worldPosition)
-        applyAimActuation(worldPosition, viewportPosition, inViewport)
+        applyAimActuation(worldPosition, viewportPosition, inViewport, Delta)
     else
         resetAimbot(true)
     end
@@ -1221,9 +981,7 @@ end))
 Library:OnUnload(function()
     resetAimbot()
     FovCircle:Destroy()
-    TriggerFovCircle:Destroy()
     AimworkTarget:Destroy()
-    AimworkTrigger:Destroy()
     clearEsp()
     pcall(function()
         TargetInfo:Destroy()

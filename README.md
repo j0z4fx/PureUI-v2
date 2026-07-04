@@ -155,7 +155,7 @@ Icons are provided through `addons/Icons.lua` and `addons/IconsData.lua` from `F
 loadstring(game:HttpGet('https://raw.githubusercontent.com/j0z4fx/PureUI-v2/main/AimworkPure.lua'))()
 ```
 
-`AimworkPure.lua` is a PureUI adapter around the bundled `addons/Aimwork.lua` runtime. Aimwork owns target selection through `TargetLock`, `Checks`, `PartFilter`, `Ignored`, and FOV objects. PureUI keeps the custom game checks, target info, player list, ESP preview, triggerbot FOV, and R6 aim-part picker, then applies the selected target with its own camera or mouse actuator.
+`AimworkPure.lua` is a PureUI adapter around the bundled `addons/Aimwork.lua` runtime. Aimwork owns target selection through target lock, checks, part filtering, ignored players, and FOV objects. PureUI keeps the custom game checks, target info, player list, ESP preview, and R6 aim-part picker, then applies the selected target with its own camera or mouse actuator.
 
 ### Command Modal
 
